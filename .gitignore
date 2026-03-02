@@ -1,0 +1,28 @@
+# Python
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.pyc
+
+# Virtual environment
+.venv/
+
+# Environment and secrets
+.env
+service-account.json
+client_secret.json
+token.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Testing
+.pytest_cache/
+.coverage
+
+# OS
+.DS_Store

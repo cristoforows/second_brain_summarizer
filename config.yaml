@@ -1,0 +1,17 @@
+llm:
+  model: "deepseek/deepseek-v3.2"
+  temperature: 0.3
+  max_tokens: 4096
+
+seed_categories:
+  - name: "work"
+    description: "Work-related tasks, meetings, projects"
+  - name: "personal"
+    description: "Personal notes, reminders, ideas"
+  - name: "learning"
+    description: "Study notes, articles, courses"
+  - name: "health"
+    description: "Health, fitness, medical notes"
+
+schedule:
+  cron: "0 8 * * *"  # Daily at 8 AM
