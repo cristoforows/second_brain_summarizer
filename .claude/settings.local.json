@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:docs.langchain.com)",
+      "WebFetch(domain:langchain-ai.github.io)",
+      "WebFetch(domain:pypi.org)",
+      "Bash(pip3 install:*)",
+      "Bash(/Users/wesley.susanto/Code/Personal/second_brain_summarizer/.venv/bin/pip freeze:*)",
+      "Bash(/Users/wesley.susanto/Code/Personal/second_brain_summarizer/.venv/bin/pytest /Users/wesley.susanto/Code/Personal/second_brain_summarizer/tests/test_parser.py -v)",
+      "Bash(/Users/wesley.susanto/Code/Personal/second_brain_summarizer/.venv/bin/pytest /Users/wesley.susanto/Code/Personal/second_brain_summarizer/tests/test_drive_service.py -v)",
+      "Bash(/Users/wesley.susanto/Code/Personal/second_brain_summarizer/.venv/bin/python3:*)",
+      "Bash(/Users/wesley.susanto/Code/Personal/second_brain_summarizer/.venv/bin/pytest /Users/wesley.susanto/Code/Personal/second_brain_summarizer/tests/test_agent.py -v)",
+      "Bash(/Users/wesley.susanto/Code/Personal/second_brain_summarizer/.venv/bin/pytest /Users/wesley.susanto/Code/Personal/second_brain_summarizer/tests/ -v)",
+      "Bash(/Users/wesley.susanto/Code/Personal/second_brain_summarizer/.venv/bin/pytest /Users/wesley.susanto/Code/Personal/second_brain_summarizer/tests/test_pipeline.py::test_full_pipeline -v --tb=long)"
+    ]
+  }
+}
