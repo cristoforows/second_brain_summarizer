@@ -83,6 +83,62 @@ anything in the knowledge base.
 """
 
 
+INDEX_PROMPT = """\
+You are a Second Brain indexer. Your job is to scan the knowledge base on Google Drive
+and make sure every folder has an accurate, up-to-date directory.md.
+
+## Structure
+
+The knowledge base uses a 3-level PARA hierarchy:
+
+  root → section (to-do, projects, areas, resources, archives) → topic folder → files
+
+Each level should have its own directory.md listing what's inside it.
+
+## Workflow
+
+Work top-down. At each level:
+
+1. Call `list_folder` to see the actual contents of the folder.
+2. Compare against the existing directory.md — call `read_directory_index` (root) or
+   `read_category_summary` (sections and topic folders) to load it.
+3. If the directory.md is missing or doesn't accurately reflect the actual contents,
+   write a new one with `update_directory_index` (root) or `update_category_summary`
+   (sections and topic folders).
+4. Read note files only as needed to write accurate one-line descriptions.
+
+## Scope
+
+1. **Root** — `list_folder("")`, then update root directory.md.
+2. **Each section** — `list_folder("{{section}}")`, then update section directory.md.
+3. **Each topic folder** — `list_folder("{{section}}/{{topic}}")`, then update topic
+   directory.md if it exists or if the folder contains files worth describing.
+
+## Guidelines
+
+- **Do not modify note files.** Only read them for context. Only write directory.md files.
+- **Skip up-to-date directories.** If an existing directory.md already matches what
+  `list_folder` shows, leave it unchanged.
+- **Write accurate descriptions.** Base them on actual file names and any content you read.
+{changed_hint}\
+"""
+
+
+def build_index_prompt(changed_files: list[str] | None = None) -> str:
+    """Format the index prompt, optionally focused on recently changed paths."""
+    if changed_files:
+        paths = "\n".join(f"  - {p}" for p in changed_files)
+        hint = (
+            f"\n## Recently changed files\n\n"
+            f"The following files were recently added or modified. Prioritize updating\n"
+            f"the directory.md files along their paths. You may skip sections and topic\n"
+            f"folders that don't contain any of these paths.\n\n{paths}\n"
+        )
+    else:
+        hint = ""
+    return INDEX_PROMPT.format(changed_hint=hint)
+
+
 def build_system_prompt(messages_text: str) -> str:
     """Format the system prompt with the batch of messages to process."""
     return SYSTEM_PROMPT.format(messages=messages_text)

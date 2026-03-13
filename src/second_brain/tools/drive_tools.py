@@ -188,6 +188,49 @@ def update_directory_index(content: str) -> str:
 
 
 @tool
+def list_folder(path: str = "") -> str:
+    """List all files and subfolders at a given path in the knowledge base.
+
+    Use this during indexing to discover the actual contents of a folder
+    rather than relying on potentially stale directory.md files.
+
+    Args:
+        path: Slash-separated path to the folder (e.g. "projects" or
+            "projects/dashboard-redesign"). Leave empty to list the root.
+
+    Returns a formatted listing with item type, name, and modification time.
+    """
+    drive = _get_drive()
+    if path:
+        try:
+            folder_id = _resolve_folder(path)
+        except ValueError:
+            return f"Path '{path}' does not exist."
+    else:
+        folder_id = _output_folder_id
+
+    items = drive.list_files(folder_id)
+    if not items:
+        return f"'{path or 'root'}' is empty."
+
+    folders = sorted(
+        [f for f in items if f.get("mimeType") == "application/vnd.google-apps.folder"],
+        key=lambda x: x["name"],
+    )
+    files = sorted(
+        [f for f in items if f.get("mimeType") != "application/vnd.google-apps.folder"],
+        key=lambda x: x["name"],
+    )
+
+    lines = []
+    for f in folders:
+        lines.append(f"[folder] {f['name']}  (modified: {f.get('modifiedTime', 'unknown')})")
+    for f in files:
+        lines.append(f"[file]   {f['name']}  (modified: {f.get('modifiedTime', 'unknown')})")
+    return "\n".join(lines)
+
+
+@tool
 def create_new_category(category_name: str, description: str) -> str:
     """Create a new topic folder inside a section, or a new section at the root.
 
@@ -223,6 +266,7 @@ def create_new_category(category_name: str, description: str) -> str:
 def get_all_tools() -> list:
     """Return all LangChain tools for registration with the agent."""
     return [
+        list_folder,
         read_directory_index,
         read_category_summary,
         read_file,
