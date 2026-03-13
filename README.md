@@ -1,6 +1,6 @@
 # Second Brain Summarizer
 
-AI agent that reads daily message dumps from Google Drive, then summarizes, categorizes, and organizes them into a living knowledge base.
+AI agent that reads daily message dumps from Google Drive, then summarizes, categorizes, and organizes them into a living knowledge base using the PARA method.
 
 Built with LangChain + LangGraph for agentic reasoning, OpenRouter for model-agnostic LLM access, and Google Drive service account for file I/O.
 
@@ -9,28 +9,37 @@ Built with LangChain + LangGraph for agentic reasoning, OpenRouter for model-agn
 1. Fetches today's dump file (`YYYY-MM-DD.md`) from an input Google Drive folder
 2. Parses messages delimited by `<!-- msg_id: {id} -->` markers
 3. An AI agent reads the existing knowledge base structure, then autonomously:
-   - Categorizes each message (using existing categories or creating new ones)
-   - Groups related messages into the same note file
-   - Merges new content with existing notes
-   - Updates category summaries with file directories
-   - Updates the root `directory.md` index
+   - Classifies each message into a PARA section (to-do, projects, areas, resources, archives)
+   - Routes messages to the appropriate topic folder within that section
+   - Merges new content with existing notes (read-before-write)
+   - Updates each section's `directory.md` after every write
+   - Updates the root `directory.md` when the top-level structure changes
 
 ## Output Structure
 
+The knowledge base uses a 3-level PARA hierarchy:
+
 ```
 Output Drive Folder/
-├── directory.md              # Root index of all categories
-├── work/
-│   ├── work.md               # Category summary + file directory
-│   ├── dashboard-redesign.md
-│   └── project-alpha.md
-├── health/
-│   ├── health.md
-│   ├── running-log.md
-│   └── appointments.md
-└── learning/
-    ├── learning.md
-    └── data-intensive-applications.md
+├── directory.md              # Root index of all 5 sections
+├── to-do/
+│   ├── directory.md          # Lists topic folders in this section
+│   └── shopping/
+│       └── groceries.md
+├── projects/
+│   ├── directory.md
+│   └── dashboard-redesign/
+│       └── notes.md
+├── areas/
+│   ├── directory.md
+│   └── health/
+│       └── running-log.md
+├── resources/
+│   ├── directory.md
+│   └── books/
+│       └── data-intensive-applications.md
+└── archives/
+    └── directory.md
 ```
 
 ## Prerequisites
@@ -55,9 +64,10 @@ cp .env.example .env
 # Edit .env with your credentials
 
 # Run
-python -m second_brain.main                    # Process today's dump
-python -m second_brain.main --date 2026-03-01  # Process a specific date
-python -m second_brain.main --schedule         # Run on cron schedule
+python -m second_brain.main                              # Process today's dump
+python -m second_brain.main --date 2026-03-01            # Process a specific date
+python -m second_brain.main --schedule                   # Run on cron schedule
+python -m second_brain.main --prompt "list all projects" # Ad-hoc query
 ```
 
 ## Configuration

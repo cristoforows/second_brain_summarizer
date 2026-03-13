@@ -104,14 +104,14 @@ class DriveService:
         """Find a folder by exact id. Returns None if not found."""
         try:
             results = self._service.files().list(
-                q=f"name='{"second_brain_bot"}' and mimeType='application/vnd.google-apps.folder' and trashed=false",
+                q="name='second_brain_bot' and mimeType='application/vnd.google-apps.folder' and trashed=false",
                 spaces='drive',
                 fields='files(id, name)',
             ).execute()
             folders = results.get('files', [])
             if folders:
                 folder_id = folders[0]['id']
-                log.info(f"Found existing folder: {"second_brain_bot"} (ID: {folder_id})")
+                log.info(f"Found existing folder: second_brain_bot (ID: {folder_id})")
                 return folder_id
         except Exception as e:
             log.error("Failed to get folder", error=e)

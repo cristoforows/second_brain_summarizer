@@ -6,6 +6,7 @@ import pytest
 
 from second_brain.tools import drive_tools
 from second_brain.tools.drive_tools import (
+    _resolve_folder,
     create_new_category,
     init_tools,
     read_category_summary,
@@ -33,8 +34,44 @@ def _drive() -> MagicMock:
 
 
 # ------------------------------------------------------------------
+# _resolve_folder
+# ------------------------------------------------------------------
+
+
+class TestResolveFolder:
+    def test_single_segment(self) -> None:
+        _drive().find_file.return_value = {
+            "id": "section-id",
+            "mimeType": "application/vnd.google-apps.folder",
+        }
+        result = _resolve_folder("projects")
+        assert result == "section-id"
+        _drive().find_file.assert_called_once_with("output-root", "projects")
+
+    def test_two_segments(self) -> None:
+        _drive().find_file.side_effect = [
+            {"id": "section-id", "mimeType": "application/vnd.google-apps.folder"},
+            {"id": "topic-id", "mimeType": "application/vnd.google-apps.folder"},
+        ]
+        result = _resolve_folder("projects/dashboard-redesign")
+        assert result == "topic-id"
+        assert _drive().find_file.call_count == 2
+
+    def test_segment_not_found(self) -> None:
+        _drive().find_file.return_value = None
+        with pytest.raises(ValueError, match="not found"):
+            _resolve_folder("projects/nope")
+
+    def test_segment_not_a_folder(self) -> None:
+        _drive().find_file.return_value = {"id": "file-id", "mimeType": "text/plain"}
+        with pytest.raises(ValueError, match="not found"):
+            _resolve_folder("projects")
+
+
+# ------------------------------------------------------------------
 # read_directory_index
 # ------------------------------------------------------------------
+
 
 class TestReadDirectoryIndex:
     def test_fresh_knowledge_base(self) -> None:
@@ -53,6 +90,7 @@ class TestReadDirectoryIndex:
 # read_category_summary
 # ------------------------------------------------------------------
 
+
 class TestReadCategorySummary:
     def test_category_not_found(self) -> None:
         _drive().find_file.return_value = None
@@ -68,10 +106,31 @@ class TestReadCategorySummary:
         result = read_category_summary.invoke({"category_name": "work"})
         assert "# Work" in result
 
+    def test_no_directory_md(self) -> None:
+        _drive().find_file.side_effect = [
+            {"id": "folder-id", "mimeType": "application/vnd.google-apps.folder"},
+            None,
+        ]
+        result = read_category_summary.invoke({"category_name": "work"})
+        assert "no directory.md yet" in result
+
+    def test_nested_path_summary_found(self) -> None:
+        _drive().find_file.side_effect = [
+            {"id": "section-id", "mimeType": "application/vnd.google-apps.folder"},
+            {"id": "topic-id", "mimeType": "application/vnd.google-apps.folder"},
+            {"id": "summary-id"},
+        ]
+        _drive().read_file_raw.return_value = "# Dashboard\nNotes here."
+        result = read_category_summary.invoke(
+            {"category_name": "projects/dashboard-redesign"}
+        )
+        assert "# Dashboard" in result
+
 
 # ------------------------------------------------------------------
 # read_file
 # ------------------------------------------------------------------
+
 
 class TestReadFile:
     def test_category_not_found(self) -> None:
@@ -96,10 +155,23 @@ class TestReadFile:
         result = read_file.invoke({"category_name": "work", "filename": "notes.md"})
         assert result == "File content here."
 
+    def test_nested_path_file_found(self) -> None:
+        _drive().find_file.side_effect = [
+            {"id": "section-id", "mimeType": "application/vnd.google-apps.folder"},
+            {"id": "topic-id", "mimeType": "application/vnd.google-apps.folder"},
+            {"id": "file-id"},
+        ]
+        _drive().read_file_raw.return_value = "Nested content."
+        result = read_file.invoke(
+            {"category_name": "projects/dashboard-redesign", "filename": "notes.md"}
+        )
+        assert result == "Nested content."
+
 
 # ------------------------------------------------------------------
 # write_to_category
 # ------------------------------------------------------------------
+
 
 class TestWriteToCategory:
     def test_category_missing(self) -> None:
@@ -132,10 +204,28 @@ class TestWriteToCategory:
         assert "Updated" in result
         _drive().update_file.assert_called_once_with("existing-id", "updated")
 
+    def test_nested_path_creates_file(self) -> None:
+        _drive().find_file.side_effect = [
+            {"id": "section-id", "mimeType": "application/vnd.google-apps.folder"},
+            {"id": "topic-id", "mimeType": "application/vnd.google-apps.folder"},
+            None,  # file doesn't exist yet
+        ]
+        _drive().write_file.return_value = "new-file-id"
+        result = write_to_category.invoke(
+            {
+                "category_name": "projects/dashboard-redesign",
+                "filename": "notes.md",
+                "content": "content",
+            }
+        )
+        assert "Created" in result
+        _drive().write_file.assert_called_once_with("topic-id", "notes.md", "content")
+
 
 # ------------------------------------------------------------------
 # update_category_summary
 # ------------------------------------------------------------------
+
 
 class TestUpdateCategorySummary:
     def test_category_missing(self) -> None:
@@ -154,7 +244,10 @@ class TestUpdateCategorySummary:
         result = update_category_summary.invoke(
             {"category_name": "work", "summary": "# Work\nOverview."}
         )
-        assert "Created summary" in result
+        assert "Created directory" in result
+        _drive().write_file.assert_called_once_with(
+            "folder-id", "directory.md", "# Work\nOverview."
+        )
 
     def test_updates_summary(self) -> None:
         _drive().find_file.side_effect = [
@@ -164,13 +257,14 @@ class TestUpdateCategorySummary:
         result = update_category_summary.invoke(
             {"category_name": "work", "summary": "updated"}
         )
-        assert "Updated summary" in result
+        assert "Updated directory" in result
         _drive().update_file.assert_called_once_with("summary-id", "updated")
 
 
 # ------------------------------------------------------------------
 # update_directory_index
 # ------------------------------------------------------------------
+
 
 class TestUpdateDirectoryIndex:
     def test_creates_directory(self) -> None:
@@ -190,6 +284,7 @@ class TestUpdateDirectoryIndex:
 # create_new_category
 # ------------------------------------------------------------------
 
+
 class TestCreateNewCategory:
     def test_already_exists(self) -> None:
         _drive().find_file.return_value = {
@@ -201,13 +296,39 @@ class TestCreateNewCategory:
         )
         assert "already exists" in result
 
-    def test_creates_folder_and_summary(self) -> None:
+    def test_creates_flat_folder(self) -> None:
         _drive().find_file.return_value = None
         _drive().create_folder.return_value = "new-folder-id"
-        _drive().write_file.return_value = "summary-id"
         result = create_new_category.invoke(
-            {"category_name": "finance", "description": "Money matters"}
+            {"category_name": "health", "description": "Health stuff"}
         )
         assert "Created category" in result
-        _drive().create_folder.assert_called_once_with("output-root", "finance")
-        _drive().write_file.assert_called_once()
+        _drive().create_folder.assert_called_once_with("output-root", "health")
+        _drive().write_file.assert_not_called()
+
+    def test_creates_nested_folder(self) -> None:
+        _drive().find_file.side_effect = [
+            {"id": "section-id", "mimeType": "application/vnd.google-apps.folder"},
+            None,  # topic doesn't exist yet
+        ]
+        _drive().create_folder.return_value = "topic-id"
+        result = create_new_category.invoke(
+            {
+                "category_name": "projects/dashboard-redesign",
+                "description": "Dashboard redesign project",
+            }
+        )
+        assert "Created category" in result
+        _drive().create_folder.assert_called_once_with("section-id", "dashboard-redesign")
+        _drive().write_file.assert_not_called()
+
+    def test_parent_not_found(self) -> None:
+        _drive().find_file.return_value = None
+        result = create_new_category.invoke(
+            {
+                "category_name": "nonexistent/dashboard-redesign",
+                "description": "Something",
+            }
+        )
+        assert "does not exist" in result
+        _drive().create_folder.assert_not_called()

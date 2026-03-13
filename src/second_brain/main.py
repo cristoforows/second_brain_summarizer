@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 import structlog
 
-from second_brain.agent.agent import build_agent, run_agent
+from second_brain.agent.agent import build_agent, run_agent, run_agent_with_prompt
 from second_brain.agent.llm import create_llm
 from second_brain.core.config import get_settings
 from second_brain.services.drive import DriveService
@@ -87,6 +87,12 @@ def main() -> None:
         help="Run on a cron schedule instead of once.",
     )
     parser.add_argument(
+        "--prompt", "-p",
+        type=str,
+        default=None,
+        help="Run the agent with a custom prompt instead of a dump file.",
+    )
+    parser.add_argument(
         "--verbose", "-v",
         action="store_true",
         help="Enable debug logging to see agent reasoning steps.",
@@ -95,7 +101,9 @@ def main() -> None:
 
     _configure_logging(verbose=args.verbose)
 
-    if args.schedule:
+    if args.prompt:
+        _run_prompt(args.prompt)
+    elif args.schedule:
         _run_scheduled()
     else:
         run_pipeline(date_str=args.date)
@@ -119,6 +127,18 @@ def _configure_logging(verbose: bool = False) -> None:
             structlog.dev.ConsoleRenderer(),
         ],
     )
+
+
+def _run_prompt(prompt: str) -> None:
+    """Initialize tools and run the agent with a custom user prompt."""
+    settings = get_settings()
+    drive = DriveService(settings.google_service_refresh_token)
+    init_tools(drive, settings.output_drive_folder_id)
+
+    llm = create_llm(settings)
+    tools = get_all_tools()
+    agent = build_agent(llm, tools)
+    run_agent_with_prompt(agent, prompt)
 
 
 def _run_scheduled() -> None:
