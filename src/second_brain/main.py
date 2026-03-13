@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 import structlog
 
-from second_brain.agent.agent import build_agent, run_agent, run_agent_with_prompt
+from second_brain.agent.agent import build_agent, run_agent, run_agent_index, run_agent_with_prompt
 from second_brain.agent.llm import create_llm
 from second_brain.core.config import get_settings
 from second_brain.services.drive import DriveService
@@ -93,6 +93,18 @@ def main() -> None:
         help="Run the agent with a custom prompt instead of a dump file.",
     )
     parser.add_argument(
+        "--index",
+        action="store_true",
+        help="Rebuild directory.md files across the knowledge base.",
+    )
+    parser.add_argument(
+        "--changed",
+        nargs="+",
+        metavar="PATH",
+        default=None,
+        help="Paths of recently added or modified files (used with --index).",
+    )
+    parser.add_argument(
         "--verbose", "-v",
         action="store_true",
         help="Enable debug logging to see agent reasoning steps.",
@@ -103,6 +115,8 @@ def main() -> None:
 
     if args.prompt:
         _run_prompt(args.prompt)
+    elif args.index:
+        _run_index(args.changed)
     elif args.schedule:
         _run_scheduled()
     else:
@@ -139,6 +153,18 @@ def _run_prompt(prompt: str) -> None:
     tools = get_all_tools()
     agent = build_agent(llm, tools)
     run_agent_with_prompt(agent, prompt)
+
+
+def _run_index(changed_files: list[str] | None = None) -> None:
+    """Initialize tools and run the indexer to rebuild directory.md files."""
+    settings = get_settings()
+    drive = DriveService(settings.google_service_refresh_token)
+    init_tools(drive, settings.output_drive_folder_id)
+
+    llm = create_llm(settings)
+    tools = get_all_tools()
+    agent = build_agent(llm, tools)
+    run_agent_index(agent, changed_files)
 
 
 def _run_scheduled() -> None:

@@ -9,6 +9,7 @@ from second_brain.tools.drive_tools import (
     _resolve_folder,
     create_new_category,
     init_tools,
+    list_folder,
     read_category_summary,
     read_directory_index,
     read_file,
@@ -66,6 +67,53 @@ class TestResolveFolder:
         _drive().find_file.return_value = {"id": "file-id", "mimeType": "text/plain"}
         with pytest.raises(ValueError, match="not found"):
             _resolve_folder("projects")
+
+
+# ------------------------------------------------------------------
+# read_directory_index
+# ------------------------------------------------------------------
+
+
+# ------------------------------------------------------------------
+# list_folder
+# ------------------------------------------------------------------
+
+
+class TestListFolder:
+    def test_root_empty(self) -> None:
+        _drive().list_files.return_value = []
+        result = list_folder.invoke({"path": ""})
+        assert "empty" in result
+        _drive().list_files.assert_called_once_with("output-root")
+
+    def test_root_lists_folders_then_files(self) -> None:
+        _drive().list_files.return_value = [
+            {"name": "projects", "mimeType": "application/vnd.google-apps.folder", "modifiedTime": "2026-01-01"},
+            {"name": "directory.md", "mimeType": "text/markdown", "modifiedTime": "2026-01-02"},
+            {"name": "areas", "mimeType": "application/vnd.google-apps.folder", "modifiedTime": "2026-01-01"},
+        ]
+        result = list_folder.invoke({"path": ""})
+        lines = result.splitlines()
+        assert lines[0].startswith("[folder] areas")
+        assert lines[1].startswith("[folder] projects")
+        assert lines[2].startswith("[file]   directory.md")
+
+    def test_nested_path(self) -> None:
+        _drive().find_file.return_value = {
+            "id": "section-id",
+            "mimeType": "application/vnd.google-apps.folder",
+        }
+        _drive().list_files.return_value = [
+            {"name": "dashboard-redesign", "mimeType": "application/vnd.google-apps.folder", "modifiedTime": "2026-01-01"},
+        ]
+        result = list_folder.invoke({"path": "projects"})
+        assert "[folder] dashboard-redesign" in result
+        _drive().list_files.assert_called_once_with("section-id")
+
+    def test_path_not_found(self) -> None:
+        _drive().find_file.return_value = None
+        result = list_folder.invoke({"path": "nonexistent"})
+        assert "does not exist" in result
 
 
 # ------------------------------------------------------------------

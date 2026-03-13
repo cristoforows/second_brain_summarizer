@@ -7,7 +7,7 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 
-from second_brain.agent.prompts import AD_HOC_PROMPT, build_system_prompt
+from second_brain.agent.prompts import AD_HOC_PROMPT, build_index_prompt, build_system_prompt
 from second_brain.core.models import Message
 
 log = structlog.get_logger()
@@ -40,6 +40,38 @@ def run_agent_with_prompt(agent: Any, prompt: str) -> dict:
 
     _log_agent_steps(result)
     log.info("agent_invocation_complete")
+
+    final = result.get("messages", [])[-1]
+    content = getattr(final, "content", "")
+    if content:
+        print(content)
+
+    return result
+
+
+def run_agent_index(agent: Any, changed_files: list[str] | None = None) -> dict:
+    """Invoke the agent to rebuild directory.md files across the knowledge base.
+
+    Args:
+        changed_files: Optional list of slash-separated file paths that were
+            recently added or modified (e.g. ["projects/dashboard/notes.md"]).
+            When provided, the agent focuses on updating directory.md files
+            along those paths rather than doing a full crawl.
+    """
+    system_prompt = build_index_prompt(changed_files)
+    log.info("agent_index_start", changed_files=changed_files or [])
+
+    result = agent.invoke(
+        {
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": "Index the knowledge base now."},
+            ]
+        },
+    )
+
+    _log_agent_steps(result)
+    log.info("agent_index_complete")
 
     final = result.get("messages", [])[-1]
     content = getattr(final, "content", "")
