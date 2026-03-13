@@ -7,7 +7,7 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 
-from second_brain.agent.prompts import build_system_prompt
+from second_brain.agent.prompts import AD_HOC_PROMPT, build_system_prompt
 from second_brain.core.models import Message
 
 log = structlog.get_logger()
@@ -20,6 +20,33 @@ def build_agent(llm: ChatOpenAI, tools: list) -> Any:
     because it includes the batch of messages to process.
     """
     return create_react_agent(model=llm, tools=tools)
+
+
+def run_agent_with_prompt(agent: Any, prompt: str) -> dict:
+    """Invoke the agent with a raw user prompt string.
+
+    Useful for ad-hoc queries like "list all existing projects".
+    """
+    log.info("agent_invocation_start", prompt=prompt[:200])
+
+    result = agent.invoke(
+        {
+            "messages": [
+                {"role": "system", "content": AD_HOC_PROMPT},
+                {"role": "user", "content": prompt},
+            ]
+        },
+    )
+
+    _log_agent_steps(result)
+    log.info("agent_invocation_complete")
+
+    final = result.get("messages", [])[-1]
+    content = getattr(final, "content", "")
+    if content:
+        print(content)
+
+    return result
 
 
 def run_agent(agent: Any, messages: list[Message]) -> dict:

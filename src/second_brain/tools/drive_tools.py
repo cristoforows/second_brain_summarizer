@@ -29,13 +29,21 @@ def _get_drive() -> DriveService:
     return _drive
 
 
-def _resolve_category_folder(category_name: str) -> str | None:
-    """Find the folder ID for a category by name. Returns None if not found."""
+def _resolve_folder(path: str) -> str:
+    """Navigate output_folder_id using a slash-separated path.
+
+    e.g. "projects/dashboard-redesign" → finds projects/ then dashboard-redesign/ inside it.
+    Returns the final folder ID.
+    Raises ValueError if any segment is not found.
+    """
     drive = _get_drive()
-    result = drive.find_file(_output_folder_id, category_name)
-    if result and result.get("mimeType") == "application/vnd.google-apps.folder":
-        return result["id"]
-    return None
+    current_id = _output_folder_id
+    for segment in path.split("/"):
+        result = drive.find_file(current_id, segment)
+        if result is None or result.get("mimeType") != "application/vnd.google-apps.folder":
+            raise ValueError(f"Folder '{segment}' not found in path '{path}'")
+        current_id = result["id"]
+    return current_id
 
 
 # ------------------------------------------------------------------
@@ -45,9 +53,9 @@ def _resolve_category_folder(category_name: str) -> str | None:
 
 @tool
 def read_directory_index() -> str:
-    """Read the directory.md file from the output folder to understand existing categories and structure.
+    """Read the directory.md file from the output folder to understand existing sections and structure.
 
-    Call this first to learn what categories exist and how the knowledge base
+    Call this first to learn what sections exist and how the knowledge base
     is organized before making any changes. Returns the content of directory.md,
     or a message indicating it doesn't exist yet.
     """
@@ -60,112 +68,111 @@ def read_directory_index() -> str:
 
 @tool
 def read_category_summary(category_name: str) -> str:
-    """Read the summary file for a category to understand what it contains.
+    """Read the directory.md for a section or topic folder.
 
     Args:
-        category_name: Name of the category folder (e.g., "work", "health").
+        category_name: Slash-separated path to the folder (e.g. "projects" or
+            "projects/dashboard-redesign").
 
-    Returns the content of the category's summary file ({category_name}.md
-    inside the category folder), or a message if the category or summary
-    doesn't exist.
+    Returns the content of directory.md inside the target folder, or a message
+    if the folder or file doesn't exist.
     """
     drive = _get_drive()
-    folder_id = _resolve_category_folder(category_name)
-    if folder_id is None:
-        return f"Category '{category_name}' does not exist."
-    summary = drive.find_file(folder_id, f"{category_name}.md")
+    try:
+        folder_id = _resolve_folder(category_name)
+    except ValueError:
+        return f"Path '{category_name}' does not exist."
+    summary = drive.find_file(folder_id, "directory.md")
     if summary is None:
-        return f"Category '{category_name}' exists but has no summary file yet."
+        return f"'{category_name}' exists but has no directory.md yet."
     return drive.read_file_raw(summary["id"])
 
 
 @tool
 def read_file(category_name: str, filename: str) -> str:
-    """Read an existing note file from a category folder.
+    """Read an existing note file from a section or topic folder.
 
     Always read a file before updating it so you can merge new content with
     existing content rather than overwriting.
 
     Args:
-        category_name: Name of the category folder (e.g., "work").
-        filename: Name of the file to read (e.g., "dashboard-redesign.md").
+        category_name: Slash-separated path to the folder (e.g. "projects/dashboard-redesign").
+        filename: Name of the file to read (e.g., "notes.md").
     """
     drive = _get_drive()
-    folder_id = _resolve_category_folder(category_name)
-    if folder_id is None:
-        return f"Category '{category_name}' does not exist."
+    try:
+        folder_id = _resolve_folder(category_name)
+    except ValueError:
+        return f"Path '{category_name}' does not exist."
     file_info = drive.find_file(folder_id, filename)
     if file_info is None:
-        return f"File '{filename}' not found in category '{category_name}'."
+        return f"File '{filename}' not found in '{category_name}'."
     return drive.read_file_raw(file_info["id"])
 
 
 @tool
 def write_to_category(category_name: str, filename: str, content: str) -> str:
-    """Create or update a note file in a category folder.
+    """Create or update a note file in a section or topic folder.
 
     If the file already exists it will be overwritten — so always read the
     file first with ``read_file`` and merge content yourself before calling
     this tool.
 
     Args:
-        category_name: Name of the category folder.
+        category_name: Slash-separated path to the folder (e.g. "projects/dashboard-redesign").
         filename: Descriptive kebab-case filename (e.g., "running-log.md").
         content: Full markdown content to write.
     """
     drive = _get_drive()
-    folder_id = _resolve_category_folder(category_name)
-    if folder_id is None:
+    try:
+        folder_id = _resolve_folder(category_name)
+    except ValueError:
         return (
-            f"Category '{category_name}' does not exist. "
+            f"Path '{category_name}' does not exist. "
             f"Create it first with create_new_category."
         )
     existing = drive.find_file(folder_id, filename)
     if existing:
         drive.update_file(existing["id"], content)
-        return f"Updated '{filename}' in category '{category_name}'."
+        return f"Updated '{filename}' in '{category_name}'."
     else:
         drive.write_file(folder_id, filename, content)
-        return f"Created '{filename}' in category '{category_name}'."
+        return f"Created '{filename}' in '{category_name}'."
 
 
 @tool
 def update_category_summary(category_name: str, summary: str) -> str:
-    """Update (or create) the summary file for a category.
+    """Update (or create) the directory.md for a section or topic folder.
 
-    The summary should contain:
-    1. A short (2-4 sentence) overview of what the category contains.
-    2. A "Files" directory listing every file in the category with a
-       one-line description of its contents.
-
-    This is regenerated each run after all new messages have been placed.
+    Call this after writing files or creating topic folders to keep the
+    section's directory.md current.
 
     Args:
-        category_name: Name of the category folder.
-        summary: Full markdown summary including overview and file directory.
+        category_name: Slash-separated path to the folder (e.g. "projects").
+        summary: Full markdown content for directory.md.
     """
     drive = _get_drive()
-    folder_id = _resolve_category_folder(category_name)
-    if folder_id is None:
+    try:
+        folder_id = _resolve_folder(category_name)
+    except ValueError:
         return (
-            f"Category '{category_name}' does not exist. "
+            f"Path '{category_name}' does not exist. "
             f"Create it first with create_new_category."
         )
-    summary_name = f"{category_name}.md"
-    existing = drive.find_file(folder_id, summary_name)
+    existing = drive.find_file(folder_id, "directory.md")
     if existing:
         drive.update_file(existing["id"], summary)
-        return f"Updated summary for category '{category_name}'."
+        return f"Updated directory for '{category_name}'."
     else:
-        drive.write_file(folder_id, summary_name, summary)
-        return f"Created summary for category '{category_name}'."
+        drive.write_file(folder_id, "directory.md", summary)
+        return f"Created directory for '{category_name}'."
 
 
 @tool
 def update_directory_index(content: str) -> str:
-    """Update the root directory.md that lists all categories and their descriptions.
+    """Update the root directory.md that lists all sections and their descriptions.
 
-    Call this after creating new categories or when the structure has changed.
+    Call this only when the overall section structure changes.
 
     Args:
         content: Full markdown content for directory.md.
@@ -182,24 +189,35 @@ def update_directory_index(content: str) -> str:
 
 @tool
 def create_new_category(category_name: str, description: str) -> str:
-    """Create a new category folder with an initial summary file.
+    """Create a new topic folder inside a section, or a new section at the root.
 
-    Use this when no existing category fits a message. After creating the
-    category, remember to update directory.md to include it.
+    Use this when no existing topic folder fits a message. After creating the
+    folder, update the section's directory.md via update_category_summary.
 
     Args:
-        category_name: Short lowercase name for the folder (e.g., "finance").
-        description: Brief description of what belongs in this category.
+        category_name: Slash-separated path for the new folder
+            (e.g. "projects/dashboard-redesign" or "health").
+        description: Brief description of what belongs in this folder.
     """
     drive = _get_drive()
-    # Check if it already exists
-    if _resolve_category_folder(category_name) is not None:
+    parts = category_name.rsplit("/", 1)
+    if len(parts) == 2:
+        parent_path, folder_name = parts
+        try:
+            parent_id = _resolve_folder(parent_path)
+        except ValueError:
+            return f"Parent path '{parent_path}' does not exist."
+    else:
+        parent_id = _output_folder_id
+        folder_name = parts[0]
+
+    existing = drive.find_file(parent_id, folder_name)
+    if existing and existing.get("mimeType") == "application/vnd.google-apps.folder":
         return f"Category '{category_name}' already exists."
-    folder_id = drive.create_folder(_output_folder_id, category_name)
-    summary_content = f"# {category_name.title()}\n\n{description}\n"
-    drive.write_file(folder_id, f"{category_name}.md", summary_content)
+
+    drive.create_folder(parent_id, folder_name)
     log.info("category_created", category=category_name)
-    return f"Created category '{category_name}' with initial summary."
+    return f"Created category '{category_name}'."
 
 
 def get_all_tools() -> list:
