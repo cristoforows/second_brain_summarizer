@@ -68,6 +68,7 @@ def run_agent_index(agent: Any, changed_files: list[str] | None = None) -> dict:
                 {"role": "user", "content": "Index the knowledge base now."},
             ]
         },
+        config={"recursion_limit": 100},
     )
 
     _log_agent_steps(result)
