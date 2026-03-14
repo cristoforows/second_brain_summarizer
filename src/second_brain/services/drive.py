@@ -1,37 +1,69 @@
 from __future__ import annotations
 
 import io
+import os
 from typing import Any
 
 import structlog
-from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 
 log = structlog.get_logger()
 
 _SCOPES = ["https://www.googleapis.com/auth/drive"]
+_CLIENT_SECRETS_FILE = "client_secret.json"
+
+
+def _load_credentials(token_path: str) -> Credentials:
+    """Load OAuth2 credentials from token_path.
+
+    If the file is missing or empty, run the local OAuth consent flow using
+    client_secret.json to obtain a fresh token, then save it to token_path.
+    """
+    token_exists = os.path.isfile(token_path) and os.path.getsize(token_path) > 0
+
+    if token_exists:
+        creds = Credentials.from_authorized_user_file(token_path, scopes=_SCOPES)
+    else:
+        log.info("token_missing_starting_oauth_flow", token_path=token_path)
+        if not os.path.isfile(_CLIENT_SECRETS_FILE):
+            raise FileNotFoundError(
+                f"'{token_path}' is missing or empty and no '{_CLIENT_SECRETS_FILE}' was found.\n"
+                f"Download your OAuth 2.0 client credentials from Google Cloud Console → "
+                f"APIs & Services → Credentials → Download JSON, and save it as '{_CLIENT_SECRETS_FILE}'."
+            )
+        from google_auth_oauthlib.flow import InstalledAppFlow
+        flow = InstalledAppFlow.from_client_secrets_file(_CLIENT_SECRETS_FILE, _SCOPES)
+        creds = flow.run_local_server(port=0)
+        with open(token_path, "w") as f:
+            f.write(creds.to_json())
+        log.info("token_saved", token_path=token_path)
+
+    if creds.expired and creds.refresh_token:
+        try:
+            creds.refresh(Request())
+        except Exception:
+            log.warning("token_refresh_failed_restarting_oauth_flow", token_path=token_path)
+            os.remove(token_path)
+            return _load_credentials(token_path)
+        with open(token_path, "w") as f:
+            f.write(creds.to_json())
+
+    return creds
 
 
 class DriveService:
-    """Google Drive CRUD operations via a service account.
+    """Google Drive CRUD operations via OAuth2 user credentials.
 
     This is a raw API wrapper with no LangChain awareness.
     """
 
-    def __init__(self, refresh_token: str) -> None:
-        creds = Credentials.from_authorized_user_file(refresh_token, scopes=_SCOPES)
-    
-    # If the access token is expired, refresh it silently
-        if creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-            # Update the file so we don't have to refresh again for another hour
-            with open('token.json', 'w') as token:
-                token.write(creds.to_json())
-                
-        self._service = build('drive', 'v3', credentials=creds)
-        log.info("drive_service_initialized", refresh_token=refresh_token)
+    def __init__(self, token_path: str) -> None:
+        creds = _load_credentials(token_path)
+        self._service = build("drive", "v3", credentials=creds)
+        log.info("drive_service_initialized", token_path=token_path)
 
     # ------------------------------------------------------------------
     # Read operations
