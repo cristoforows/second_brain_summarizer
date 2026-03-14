@@ -90,7 +90,6 @@ class DriveService:
                 )
                 .execute()
             )
-            print(resp)
             results.extend(resp.get("files", []))
             page_token = resp.get("nextPageToken")
             if not page_token:
@@ -129,7 +128,6 @@ class DriveService:
             .execute()
         )
         files = resp.get("files", [])
-        log.warning("files", files=files)
         return files[0] if files else None
 
     def find_folder(self, folder_id: str) -> dict[str, Any] | None:
