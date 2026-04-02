@@ -27,7 +27,7 @@ def run_agent_with_prompt(agent: Any, prompt: str) -> dict:
 
     Useful for ad-hoc queries like "list all existing projects".
     """
-    log.info("agent_invocation_start", prompt=prompt[:200])
+    log.info("agent_invocation_start")
 
     result = agent.invoke(
         {
@@ -36,6 +36,7 @@ def run_agent_with_prompt(agent: Any, prompt: str) -> dict:
                 {"role": "user", "content": prompt},
             ]
         },
+        config={"recursion_limit": 100},
     )
 
     _log_agent_steps(result)
@@ -95,6 +96,7 @@ def run_agent(agent: Any, messages: list[Message]) -> dict:
 
     result = agent.invoke(
         {"messages": [{"role": "user", "content": system_prompt}]},
+        config={"recursion_limit": 100},
     )
 
     _log_agent_steps(result)
@@ -120,7 +122,7 @@ def _log_agent_steps(result: dict) -> None:
                 for tc in tool_calls:
                     step += 1
                     log.debug(
-                        "agent_step " + str(step),
+                        "agent_step",
                         step=step,
                         action="tool_call",
                         tool=tc.get("name"),
@@ -131,7 +133,7 @@ def _log_agent_steps(result: dict) -> None:
             if content:
                 step += 1
                 log.debug(
-                     "agent_step " + str(step),
+                    "agent_step",
                     step=step,
                     action="thinking",
                     content=content[:500],
@@ -141,7 +143,7 @@ def _log_agent_steps(result: dict) -> None:
             step += 1
             content = getattr(msg, "content", "")
             log.debug(
-                "agent_step " + str(step),
+                "agent_step",
                 step=step,
                 action="tool_result",
                 tool=getattr(msg, "name", "unknown"),

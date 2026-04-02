@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -14,12 +15,9 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[3]  # second_brain_summarizer/
 
 class LLMConfig(BaseSettings):
     model: str = "deepseek/deepseek-v3.2"
+    provider: dict | None = None
     temperature: float = 0.3
     max_tokens: int = 4096
-
-
-class ScheduleConfig(BaseSettings):
-    cron: str = "0 8 * * *"
 
 
 class Settings(BaseSettings):
@@ -40,7 +38,6 @@ class Settings(BaseSettings):
     # --- Non-secrets (from config.yaml) ---
     llm: LLMConfig = Field(default_factory=LLMConfig)
     seed_categories: list[Category] = Field(default_factory=list)
-    schedule: ScheduleConfig = Field(default_factory=ScheduleConfig)
 
     @model_validator(mode="before")
     @classmethod
@@ -56,6 +53,7 @@ class Settings(BaseSettings):
         return values
 
 
+@lru_cache(maxsize=1)
 def get_settings() -> Settings:
     """Return a cached Settings instance."""
     return Settings()

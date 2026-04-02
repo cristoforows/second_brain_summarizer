@@ -11,16 +11,18 @@ log = structlog.get_logger()
 # Tools are closures over this instance.
 _drive: DriveService | None = None
 _output_folder_id: str = ""
+_dry_run: bool = False
 
 
-def init_tools(drive: DriveService, output_folder_id: str) -> None:
+def init_tools(drive: DriveService, output_folder_id: str, dry_run: bool = False) -> None:
     """Initialize the module with a DriveService instance and output folder ID.
 
     Must be called before any tool is invoked.
     """
-    global _drive, _output_folder_id
+    global _drive, _output_folder_id, _dry_run
     _drive = drive
     _output_folder_id = output_folder_id
+    _dry_run = dry_run
 
 
 def _get_drive() -> DriveService:
@@ -132,6 +134,10 @@ def write_to_category(category_name: str, filename: str, content: str) -> str:
             f"Create it first with create_new_category."
         )
     existing = drive.find_file(folder_id, filename)
+    if _dry_run:
+        action = "update" if existing else "create"
+        log.info("dry_run_skip", action=action, file=filename, category=category_name)
+        return f"[dry-run] Would {action} '{filename}' in '{category_name}'."
     if existing:
         drive.update_file(existing["id"], content)
         return f"Updated '{filename}' in '{category_name}'."
@@ -160,6 +166,10 @@ def update_category_summary(category_name: str, summary: str) -> str:
             f"Create it first with create_new_category."
         )
     existing = drive.find_file(folder_id, "directory.md")
+    if _dry_run:
+        action = "update" if existing else "create"
+        log.info("dry_run_skip", action=action, file="directory.md", category=category_name)
+        return f"[dry-run] Would {action} directory.md for '{category_name}'."
     if existing:
         drive.update_file(existing["id"], summary)
         return f"Updated directory for '{category_name}'."
@@ -179,6 +189,10 @@ def update_directory_index(content: str) -> str:
     """
     drive = _get_drive()
     existing = drive.find_file(_output_folder_id, "directory.md")
+    if _dry_run:
+        action = "update" if existing else "create"
+        log.info("dry_run_skip", action=action, file="directory.md", category="root")
+        return f"[dry-run] Would {action} root directory.md."
     if existing:
         drive.update_file(existing["id"], content)
         return "Updated directory.md."
@@ -231,7 +245,7 @@ def list_folder(path: str = "") -> str:
 
 
 @tool
-def create_new_category(category_name: str, description: str) -> str:
+def create_new_category(category_name: str) -> str:
     """Create a new topic folder inside a section, or a new section at the root.
 
     Use this when no existing topic folder fits a message. After creating the
@@ -240,7 +254,6 @@ def create_new_category(category_name: str, description: str) -> str:
     Args:
         category_name: Slash-separated path for the new folder
             (e.g. "projects/dashboard-redesign" or "health").
-        description: Brief description of what belongs in this folder.
     """
     drive = _get_drive()
     parts = category_name.rsplit("/", 1)
@@ -257,6 +270,10 @@ def create_new_category(category_name: str, description: str) -> str:
     existing = drive.find_file(parent_id, folder_name)
     if existing and existing.get("mimeType") == "application/vnd.google-apps.folder":
         return f"Category '{category_name}' already exists."
+
+    if _dry_run:
+        log.info("dry_run_skip", action="create_folder", category=category_name)
+        return f"[dry-run] Would create category '{category_name}'."
 
     drive.create_folder(parent_id, folder_name)
     log.info("category_created", category=category_name)
