@@ -14,7 +14,7 @@ The 5 sections (to-do, projects, areas, resources, archives) are fixed.
 Each level has its own `directory.md`:
 
 - **Root `directory.md`** — lists all 5 sections with brief descriptions. Largely fixed;
-  update it only when the overall section structure changes.
+  update it only when there's changes / addition of a new topic within Projects, Areas, or Resources sections
 - **Section `directory.md`** (e.g. `projects/directory.md`) — lists all topic folders
   within that section. The agent is responsible for creating this file if it doesn't
   exist and keeping it updated whenever a new topic folder is added.
@@ -39,7 +39,7 @@ Each level has its own `directory.md`:
    new content in. New files can be written directly.
 
 6. **Create topic folders when needed** — if no existing topic folder fits, create one
-   inside the appropriate section: `create_new_category("{{section}}/{{topic}}", description)`.
+   inside the appropriate section: `create_new_category("{{section}}/{{topic}}")`.
 
 7. **Update the section directory** — after every write or folder creation, update the
    section's `directory.md` via `update_category_summary("{{section}}", updated_content)`.
@@ -144,6 +144,3 @@ def build_system_prompt(messages_text: str) -> str:
     return SYSTEM_PROMPT.format(messages=messages_text)
 
 
-def build_ad_hoc_prompt() -> str:
-    """Return the ad-hoc system prompt for interactive queries."""
-    return AD_HOC_PROMPT

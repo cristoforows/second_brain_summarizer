@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import io
+import json
 import os
 from typing import Any
 
 import structlog
+from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseUpload
 
 log = structlog.get_logger()
@@ -16,40 +19,63 @@ _SCOPES = ["https://www.googleapis.com/auth/drive"]
 _CLIENT_SECRETS_FILE = "client_secret.json"
 
 
+def _escape_drive_query(value: str) -> str:
+    """Escape a value for safe interpolation into a Drive API query string."""
+    return value.replace("\\", "\\\\").replace("'", "\\'")
+
+
+def _write_token(token_path: str, creds: Credentials) -> None:
+    """Write OAuth credentials to token_path with owner-only permissions (0o600)."""
+    fd = os.open(token_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write(creds.to_json())
+
+
 def _load_credentials(token_path: str) -> Credentials:
-    """Load OAuth2 credentials from token_path.
+    """Load OAuth2 credentials.
 
-    If the file is missing or empty, run the local OAuth consent flow using
-    client_secret.json to obtain a fresh token, then save it to token_path.
+    Checks GOOGLE_TOKEN_JSON env var first (used in CI/GHA — no file needed).
+    Falls back to token_path on disk (used locally).
+    If neither exists, runs the interactive OAuth consent flow.
     """
-    token_exists = os.path.isfile(token_path) and os.path.getsize(token_path) > 0
+    token_json_env = os.environ.get("GOOGLE_TOKEN_JSON")
 
-    if token_exists:
-        creds = Credentials.from_authorized_user_file(token_path, scopes=_SCOPES)
+    if token_json_env:
+        log.info("loading_credentials_from_env")
+        creds = Credentials.from_authorized_user_info(json.loads(token_json_env), scopes=_SCOPES)
+        from_env = True
     else:
-        log.info("token_missing_starting_oauth_flow", token_path=token_path)
-        if not os.path.isfile(_CLIENT_SECRETS_FILE):
-            raise FileNotFoundError(
-                f"'{token_path}' is missing or empty and no '{_CLIENT_SECRETS_FILE}' was found.\n"
-                f"Download your OAuth 2.0 client credentials from Google Cloud Console → "
-                f"APIs & Services → Credentials → Download JSON, and save it as '{_CLIENT_SECRETS_FILE}'."
-            )
-        from google_auth_oauthlib.flow import InstalledAppFlow
-        flow = InstalledAppFlow.from_client_secrets_file(_CLIENT_SECRETS_FILE, _SCOPES)
-        creds = flow.run_local_server(port=0)
-        with open(token_path, "w") as f:
-            f.write(creds.to_json())
-        log.info("token_saved", token_path=token_path)
+        from_env = False
+        token_exists = os.path.isfile(token_path) and os.path.getsize(token_path) > 0
+        if token_exists:
+            creds = Credentials.from_authorized_user_file(token_path, scopes=_SCOPES)
+        else:
+            log.info("token_missing_starting_oauth_flow", token_path=token_path)
+            if not os.path.isfile(_CLIENT_SECRETS_FILE):
+                raise FileNotFoundError(
+                    f"'{token_path}' is missing or empty and no '{_CLIENT_SECRETS_FILE}' was found.\n"
+                    f"Download your OAuth 2.0 client credentials from Google Cloud Console → "
+                    f"APIs & Services → Credentials → Download JSON, and save it as '{_CLIENT_SECRETS_FILE}'."
+                )
+            from google_auth_oauthlib.flow import InstalledAppFlow
+            flow = InstalledAppFlow.from_client_secrets_file(_CLIENT_SECRETS_FILE, _SCOPES)
+            creds = flow.run_local_server(port=0)
+            _write_token(token_path, creds)
+            log.info("token_saved", token_path=token_path)
 
     if creds.expired and creds.refresh_token:
         try:
             creds.refresh(Request())
-        except Exception:
-            log.warning("token_refresh_failed_restarting_oauth_flow", token_path=token_path)
-            os.remove(token_path)
-            return _load_credentials(token_path)
-        with open(token_path, "w") as f:
-            f.write(creds.to_json())
+            if not from_env:
+                _write_token(token_path, creds)
+        except RefreshError as e:
+            log.warning("token_refresh_failed", error=str(e))
+            if not from_env:
+                os.remove(token_path)
+            raise RuntimeError(
+                "OAuth token refresh failed. "
+                "Re-authenticate by running the script interactively or updating the GOOGLE_TOKEN_JSON secret."
+            ) from e
 
     return creds
 
@@ -73,23 +99,27 @@ class DriveService:
         self, folder_id: str, mime_type: str | None = None
     ) -> list[dict[str, Any]]:
         """List files in a folder. Optionally filter by MIME type."""
-        query = f"parents='{folder_id}' and trashed = false"
+        query = f"parents='{_escape_drive_query(folder_id)}' and trashed = false"
         if mime_type:
-            query += f" and mimeType = '{mime_type}'"
+            query += f" and mimeType = '{_escape_drive_query(mime_type)}'"
 
         results: list[dict[str, Any]] = []
         page_token: str | None = None
 
         while True:
-            resp = (
-                self._service.files()
-                .list(
-                    q=query,
-                    fields="nextPageToken, files(id, name, mimeType, modifiedTime)",
-                    pageToken=page_token,
+            try:
+                resp = (
+                    self._service.files()
+                    .list(
+                        q=query,
+                        fields="nextPageToken, files(id, name, mimeType, modifiedTime)",
+                        pageToken=page_token,
+                    )
+                    .execute()
                 )
-                .execute()
-            )
+            except HttpError as e:
+                log.error("drive_list_files_failed", folder_id=folder_id, status=e.status_code, error=str(e))
+                raise
             results.extend(resp.get("files", []))
             page_token = resp.get("nextPageToken")
             if not page_token:
@@ -99,54 +129,52 @@ class DriveService:
 
     def read_file(self, file_id: str) -> str:
         """Download and return the text content of a file."""
-        content = (
-            self._service.files()
-            .export(fileId=file_id, mimeType="text/plain")
-            .execute()
-        )
-        if isinstance(content, bytes):
-            return content.decode("utf-8")
-        return str(content)
+        try:
+            content = (
+                self._service.files()
+                .export(fileId=file_id, mimeType="text/plain")
+                .execute()
+            )
+        except HttpError as e:
+            log.error("drive_read_file_failed", file_id=file_id, status=e.status_code, error=str(e))
+            raise
+        try:
+            return content.decode("utf-8") if isinstance(content, bytes) else str(content)
+        except UnicodeDecodeError as e:
+            log.error("drive_read_file_decode_failed", file_id=file_id, error=str(e))
+            raise
 
     def read_file_raw(self, file_id: str) -> str:
         """Download raw file content (for non-Google-Docs files like .md)."""
-        content = self._service.files().get_media(fileId=file_id).execute()
-        if isinstance(content, bytes):
-            return content.decode("utf-8")
-        return str(content)
+        try:
+            content = self._service.files().get_media(fileId=file_id).execute()
+        except HttpError as e:
+            log.error("drive_read_file_raw_failed", file_id=file_id, status=e.status_code, error=str(e))
+            raise
+        try:
+            return content.decode("utf-8") if isinstance(content, bytes) else str(content)
+        except UnicodeDecodeError as e:
+            log.error("drive_read_file_raw_decode_failed", file_id=file_id, error=str(e))
+            raise
 
     def find_file(self, folder_id: str, name: str) -> dict[str, Any] | None:
         """Find a file by exact name within a folder. Returns None if not found."""
         query = (
-            f"parents='{folder_id}' "
-            f"and name = '{name}' "
+            f"parents='{_escape_drive_query(folder_id)}' "
+            f"and name = '{_escape_drive_query(name)}' "
             f"and trashed = false"
         )
-        resp = (
-            self._service.files()
-            .list(q=query, fields="files(id, name, mimeType)", pageSize=1)
-            .execute()
-        )
+        try:
+            resp = (
+                self._service.files()
+                .list(q=query, fields="files(id, name, mimeType)", pageSize=1)
+                .execute()
+            )
+        except HttpError as e:
+            log.error("drive_find_file_failed", folder_id=folder_id, name=name, status=e.status_code, error=str(e))
+            raise
         files = resp.get("files", [])
         return files[0] if files else None
-
-    def find_folder(self, folder_id: str) -> dict[str, Any] | None:
-        """Find a folder by exact id. Returns None if not found."""
-        try:
-            results = self._service.files().list(
-                q="name='second_brain_bot' and mimeType='application/vnd.google-apps.folder' and trashed=false",
-                spaces='drive',
-                fields='files(id, name)',
-            ).execute()
-            folders = results.get('files', [])
-            if folders:
-                folder_id = folders[0]['id']
-                log.info(f"Found existing folder: second_brain_bot (ID: {folder_id})")
-                return folder_id
-        except Exception as e:
-            log.error("Failed to get folder", error=e)
-            return None
-
 
     # ------------------------------------------------------------------
     # Write operations
@@ -163,11 +191,15 @@ class DriveService:
             mimetype="text/markdown",
             resumable=False,
         )
-        created = (
-            self._service.files()
-            .create(body=file_metadata, media_body=media, fields="id")
-            .execute()
-        )
+        try:
+            created = (
+                self._service.files()
+                .create(body=file_metadata, media_body=media, fields="id")
+                .execute()
+            )
+        except HttpError as e:
+            log.error("drive_write_file_failed", name=name, folder_id=folder_id, status=e.status_code, error=str(e))
+            raise
         file_id = created["id"]
         log.info("file_created", name=name, folder_id=folder_id, file_id=file_id)
         return file_id
@@ -179,7 +211,11 @@ class DriveService:
             mimetype="text/markdown",
             resumable=False,
         )
-        self._service.files().update(fileId=file_id, media_body=media).execute()
+        try:
+            self._service.files().update(fileId=file_id, media_body=media).execute()
+        except HttpError as e:
+            log.error("drive_update_file_failed", file_id=file_id, status=e.status_code, error=str(e))
+            raise
         log.info("file_updated", file_id=file_id)
 
     def create_folder(self, parent_id: str, name: str) -> str:
@@ -189,11 +225,15 @@ class DriveService:
             "mimeType": "application/vnd.google-apps.folder",
             "parents": [parent_id],
         }
-        folder = (
-            self._service.files()
-            .create(body=file_metadata, fields="id")
-            .execute()
-        )
+        try:
+            folder = (
+                self._service.files()
+                .create(body=file_metadata, fields="id")
+                .execute()
+            )
+        except HttpError as e:
+            log.error("drive_create_folder_failed", name=name, parent_id=parent_id, status=e.status_code, error=str(e))
+            raise
         folder_id = folder["id"]
         log.info("folder_created", name=name, parent_id=parent_id, folder_id=folder_id)
         return folder_id

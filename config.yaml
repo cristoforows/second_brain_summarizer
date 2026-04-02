@@ -1,5 +1,9 @@
 llm:
-  model: "deepseek/deepseek-v3.2"
+  model: "minimax/minimax-m2.7"
+  provider:
+    order:
+      - "minimax/fp8"
+    allow_fallbacks: false
   temperature: 0.3
   max_tokens: 4096
 
@@ -12,6 +16,3 @@ seed_categories:
     description: "Study notes, articles, courses"
   - name: "health"
     description: "Health, fitness, medical notes"
-
-schedule:
-  cron: "0 8 * * *"  # Daily at 8 AM

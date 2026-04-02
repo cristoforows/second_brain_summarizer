@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import sys
 from datetime import datetime, timezone
 
 import structlog
@@ -17,26 +16,33 @@ from second_brain.utils.parser import parse_dump
 log = structlog.get_logger()
 
 
-def run_pipeline(date_str: str | None = None) -> None:
+def _init_agent(dry_run: bool = False) -> tuple:
+    """Initialize Drive, tools, and agent. Shared by all pipeline entry points."""
+    settings = get_settings()
+    drive = DriveService(settings.google_service_refresh_token)
+    init_tools(drive, settings.output_drive_folder_id, dry_run=dry_run)
+    llm = create_llm(settings)
+    tools = get_all_tools()
+    agent = build_agent(llm, tools)
+    return settings, drive, agent
+
+
+def run_pipeline(date_str: str | None = None, dry_run: bool = False) -> None:
     """Execute the full summarization pipeline for a given date.
 
     Args:
         date_str: Date string (YYYY-MM-DD) to look for the dump file.
                   Defaults to today in UTC.
     """
-    settings = get_settings()
+    settings, drive, agent = _init_agent(dry_run=dry_run)
 
     if not date_str:
         date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     log.info("pipeline_start", date=date_str)
 
-    # --- Initialize services ---
-    drive = DriveService(settings.google_service_refresh_token)
-    init_tools(drive, settings.output_drive_folder_id)
-
     # --- Find today's dump file ---
-    dump_filename = f"{date_str}"
+    dump_filename = f"{date_str}.md"
     dump_file = drive.find_file(settings.input_drive_folder_id, dump_filename)
     if dump_file is None:
         log.warning("no_dump_file_found", filename=dump_filename)
@@ -56,10 +62,7 @@ def run_pipeline(date_str: str | None = None) -> None:
 
     log.info("messages_parsed", count=len(messages))
 
-    # --- Build and run agent ---
-    llm = create_llm(settings)
-    tools = get_all_tools()
-    agent = build_agent(llm, tools)
+    # --- Run agent ---
     result = run_agent(agent, messages)
 
     log.info(
@@ -80,11 +83,6 @@ def main() -> None:
         type=str,
         default=None,
         help="Date to process (YYYY-MM-DD). Defaults to today.",
-    )
-    parser.add_argument(
-        "--schedule",
-        action="store_true",
-        help="Run on a cron schedule instead of once.",
     )
     parser.add_argument(
         "--prompt", "-p",
@@ -109,18 +107,25 @@ def main() -> None:
         action="store_true",
         help="Enable debug logging to see agent reasoning steps.",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Run the full pipeline but skip all Drive write operations.",
+    )
     args = parser.parse_args()
 
     _configure_logging(verbose=args.verbose)
 
+    if args.dry_run:
+        log.info("dry_run_mode_enabled")
+        print("[dry-run] No changes will be written to Google Drive.")
+
     if args.prompt:
-        _run_prompt(args.prompt)
+        _run_prompt(args.prompt, dry_run=args.dry_run)
     elif args.index:
-        _run_index(args.changed)
-    elif args.schedule:
-        _run_scheduled()
+        _run_index(args.changed, dry_run=args.dry_run)
     else:
-        run_pipeline(date_str=args.date)
+        run_pipeline(date_str=args.date, dry_run=args.dry_run)
 
 
 def _configure_logging(verbose: bool = False) -> None:
@@ -143,61 +148,17 @@ def _configure_logging(verbose: bool = False) -> None:
     )
 
 
-def _run_prompt(prompt: str) -> None:
+def _run_prompt(prompt: str, dry_run: bool = False) -> None:
     """Initialize tools and run the agent with a custom user prompt."""
-    settings = get_settings()
-    drive = DriveService(settings.google_service_refresh_token)
-    init_tools(drive, settings.output_drive_folder_id)
-
-    llm = create_llm(settings)
-    tools = get_all_tools()
-    agent = build_agent(llm, tools)
+    _, _, agent = _init_agent(dry_run=dry_run)
     run_agent_with_prompt(agent, prompt)
 
 
-def _run_index(changed_files: list[str] | None = None) -> None:
+def _run_index(changed_files: list[str] | None = None, dry_run: bool = False) -> None:
     """Initialize tools and run the indexer to rebuild directory.md files."""
-    settings = get_settings()
-    drive = DriveService(settings.google_service_refresh_token)
-    init_tools(drive, settings.output_drive_folder_id)
-
-    llm = create_llm(settings)
-    tools = get_all_tools()
-    agent = build_agent(llm, tools)
+    _, _, agent = _init_agent(dry_run=dry_run)
     run_agent_index(agent, changed_files)
 
-
-def _run_scheduled() -> None:
-    """Run the pipeline on a cron schedule using APScheduler."""
-    from apscheduler.schedulers.blocking import BlockingScheduler
-    from apscheduler.triggers.cron import CronTrigger
-
-    settings = get_settings()
-    cron_expr = settings.schedule.cron
-
-    # Parse cron expression: "minute hour day month day_of_week"
-    parts = cron_expr.split()
-    trigger = CronTrigger(
-        minute=parts[0],
-        hour=parts[1],
-        day=parts[2],
-        month=parts[3],
-        day_of_week=parts[4],
-    )
-
-    scheduler = BlockingScheduler()
-    scheduler.add_job(run_pipeline, trigger)
-
-    log.info("scheduler_started", cron=cron_expr)
-    print(f"Scheduler started with cron: {cron_expr}")
-    print("Press Ctrl+C to exit.")
-
-    try:
-        scheduler.start()
-    except KeyboardInterrupt:
-        log.info("scheduler_stopped")
-        print("\nScheduler stopped.")
-        sys.exit(0)
 
 
 if __name__ == "__main__":
