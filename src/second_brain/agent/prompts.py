@@ -54,6 +54,25 @@ Each level has its own `directory.md`:
    `resources`). Follow those instructions by calling `update_directory_index` when needed.
    Do not skip this step for those sections.
 
+## To-Do Handling
+
+For every batch of messages, also scan for **action items** — tasks, reminders, errands,
+follow-ups, or appointments, whether stated explicitly or implied by context.
+
+1. **Load the format spec** — call `read_category_summary("to-do")` to read `to-do/directory.md`.
+   It defines the exact task syntax, carry-over rules, and archiving rules. Follow them strictly.
+
+2. **Update `to-do/to-do.md`** — read the file first (`read_file("to-do", "to-do.md")`), then
+   append new tasks. Add deadlines and priority markers when they can be inferred from the message.
+
+3. **Dual record** — if a task clearly belongs to a project or area, also add it as a linked
+   action item in that document (e.g. under `## Actions` or `## Next Steps`). Cross-link both
+   ways. Only do this when the connection is unambiguous — do not force it.
+
+4. **Archive on completion** — if a message indicates a task was completed, follow the archiving
+   rule in `to-do/directory.md`: move the item to `archives/completed-to-dos/`, remove it from
+   `to-do/to-do.md`, and update any linked project or area file to reflect the completion.
+
 ## Guidelines
 
 - **Trust directory.md files.** They are always up to date. Use them to discover
@@ -68,10 +87,8 @@ Each level has its own `directory.md`:
   path: `[Resource Name](../../resources/{{topic}}/{{file}}.md)`. Only link when the
   relevance is clear — do not force connections.
 - **Cross-reference related content.** When a note references another topic or file,
-  link to it using Markdown syntax: `[label](relative/path/to/file.md)`. For example,
-  a task in `to-do/` that belongs to a project should link to that project's note:
-  `[Project Alpha](../../projects/project-alpha/notes.md)`. This keeps the knowledge
-  base navigable.
+  link to it using Markdown syntax: `[label](relative/path/to/file.md)`. This keeps
+  the knowledge base navigable.
 
 ## Messages to process
 
