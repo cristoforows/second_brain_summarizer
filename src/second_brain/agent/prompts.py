@@ -34,6 +34,10 @@ Each level has its own `directory.md`:
 4. **Navigate to the topic** — if a matching topic folder exists, read any relevant
    files inside it before deciding what to write or update.
 
+   If the target section is `projects`, also call `read_category_summary("resources")`
+   and scan for any topic folders related to the message. If a relevant match is found,
+   read the resource file and include a link to it in the project note.
+
 5. **Write** — use `write_to_category` with the path `"{{section}}/{{topic}}"` as the
    category. If the file already exists, read it first (`read_file`) and merge the
    new content in. New files can be written directly.
@@ -60,6 +64,9 @@ Each level has its own `directory.md`:
   the new content.
 - **Read before overwriting.** If a file already exists, always call `read_file` before
   `write_to_category`.
+- **Resources feed projects.** When linking a resource into a project, use a relative
+  path: `[Resource Name](../../resources/{{topic}}/{{file}}.md)`. Only link when the
+  relevance is clear — do not force connections.
 - **Cross-reference related content.** When a note references another topic or file,
   link to it using Markdown syntax: `[label](relative/path/to/file.md)`. For example,
   a task in `to-do/` that belongs to a project should link to that project's note:
@@ -80,6 +87,18 @@ understand the current structure (sections, topic folders, and their contents).
 
 Execute the user's request precisely. You may read, query, reorganize, or write
 anything in the knowledge base.
+
+## Guidelines
+
+- **Merge, don't duplicate.** Append to existing notes rather than creating new files.
+- **Read before overwriting.** Always call `read_file` before `write_to_category`.
+- **Kebab-case filenames.** e.g. `dashboard-redesign.md`, `running-log.md`
+- **Date new entries.** When appending to an existing note, add `## YYYY-MM-DD` before
+  the new content.
+- **Keep directories up to date.** After any write or structural change, update the
+  relevant `directory.md` files via `update_category_summary` or `update_directory_index`.
+- **Summarize changes.** After completing the request, report a brief summary of what
+  was created, modified, or moved.
 """
 
 
@@ -111,8 +130,8 @@ Work top-down. At each level:
 
 1. **Root** — `list_folder("")`, then update root directory.md.
 2. **Each section** — `list_folder("{{section}}")`, then update section directory.md.
-3. **Each topic folder** — `list_folder("{{section}}/{{topic}}")`, then update topic
-   directory.md if it exists or if the folder contains files worth describing.
+3. **Each topic folder** — `list_folder("{{section}}/{{topic}}")`, then create or update
+   the topic directory.md if the folder contains at least one file.
 
 ## Guidelines
 
