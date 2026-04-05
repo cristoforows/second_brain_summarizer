@@ -1,0 +1,8 @@
+llm:
+  model: "deepseek/deepseek-v3.2"
+  provider:
+    order:
+      - "deepseek"
+    allow_fallbacks: false
+  temperature: 0.3
+  max_tokens: 4096
