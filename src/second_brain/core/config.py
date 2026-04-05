@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     google_service_refresh_token: str = "./token.json"
     input_drive_folder_id: str = ""
     output_drive_folder_id: str = ""
+    google_calendar_id: str = "primary"
 
     # --- Non-secrets (from config.yaml) ---
     llm: LLMConfig = Field(default_factory=LLMConfig)

@@ -9,7 +9,9 @@ import structlog
 from second_brain.agent.agent import build_agent, run_agent, run_agent_index, run_agent_with_prompt
 from second_brain.agent.llm import create_llm
 from second_brain.core.config import get_settings
+from second_brain.services.calendar import CalendarService
 from second_brain.services.drive import DriveService
+from second_brain.tools.calendar_tools import get_all_calendar_tools, init_calendar_tools
 from second_brain.tools.drive_tools import get_all_tools, init_tools
 from second_brain.utils.parser import parse_dump
 
@@ -17,12 +19,14 @@ log = structlog.get_logger()
 
 
 def _init_agent(dry_run: bool = False) -> tuple:
-    """Initialize Drive, tools, and agent. Shared by all pipeline entry points."""
+    """Initialize Drive, Calendar, tools, and agent. Shared by all pipeline entry points."""
     settings = get_settings()
     drive = DriveService(settings.google_service_refresh_token)
     init_tools(drive, settings.output_drive_folder_id, dry_run=dry_run)
+    calendar = CalendarService(settings.google_service_refresh_token)
+    init_calendar_tools(calendar, settings.google_calendar_id)
     llm = create_llm(settings)
-    tools = get_all_tools()
+    tools = get_all_tools() + get_all_calendar_tools()
     agent = build_agent(llm, tools)
     return settings, drive, agent
 

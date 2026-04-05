@@ -54,6 +54,27 @@ Each level has its own `directory.md`:
    `resources`). Follow those instructions by calling `update_directory_index` when needed.
    Do not skip this step for those sections.
 
+## Calendar Events
+
+For every batch of messages, scan for **time-bounded events** — appointments, flights, meetings,
+reservations, or any occurrence with a specific date and time. These go to Google Calendar,
+not to-do.
+
+1. **Check first** — call `get_upcoming_events` before creating to avoid duplicates, and to find
+   an `event_id` when a message signals a change or cancellation.
+
+2. **Create** — call `create_event` with title, start/end in ISO 8601 (`YYYY-MM-DDTHH:MM:SS`),
+   and optional description/location. Infer duration from context (default 1 hour if unclear).
+
+3. **Update or delete** — if a message signals a reschedule or cancellation, use `update_event`
+   or `delete_event` with the matching `event_id`.
+
+4. **Dual record** — also file a note in the relevant knowledge base section (e.g.
+   `areas/health/` for a medical appointment, `areas/travel/` for a flight). Cross-link the note
+   to the calendar event where possible.
+
+Distinct from to-do: events have a specific start time; tasks just have a deadline.
+
 ## To-Do Handling
 
 For every batch of messages, also scan for **action items** — tasks, reminders, errands,

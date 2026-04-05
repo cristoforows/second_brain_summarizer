@@ -15,7 +15,10 @@ from googleapiclient.http import MediaIoBaseUpload
 
 log = structlog.get_logger()
 
-_SCOPES = ["https://www.googleapis.com/auth/drive"]
+_SCOPES = [
+    "https://www.googleapis.com/auth/drive",
+    "https://www.googleapis.com/auth/calendar",
+]
 _CLIENT_SECRETS_FILE = "client_secret.json"
 
 
