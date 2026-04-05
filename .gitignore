@@ -14,6 +14,7 @@ build/
 service-account.json
 client_secret.json
 token.json
+config.yaml
 
 # IDE
 .idea/
