@@ -7,8 +7,6 @@ import structlog
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-from second_brain.services.auth import load_credentials
-
 log = structlog.get_logger()
 
 
@@ -18,10 +16,12 @@ class CalendarService:
     Reuses the same token as DriveService — no separate auth flow needed.
     """
 
-    def __init__(self, token_path: str) -> None:
-        creds = load_credentials(token_path)
+    def __init__(self, token_path: str | None = None, *, creds: "Credentials | None" = None) -> None:
+        if creds is None:
+            from second_brain.services.auth import load_credentials
+            creds = load_credentials(token_path)
         self._service = build("calendar", "v3", credentials=creds)
-        log.info("calendar_service_initialized", token_path=token_path)
+        log.info("calendar_service_initialized")
 
     def create_event(
         self,
@@ -44,6 +44,8 @@ class CalendarService:
         """
         body: dict[str, Any] = {
             "summary": title,
+            # TODO: hardcoded UTC — events display at wrong local time if calendar isn't UTC.
+            # Accept a timezone parameter or infer from user's calendar settings.
             "start": {"dateTime": start, "timeZone": "UTC"},
             "end": {"dateTime": end, "timeZone": "UTC"},
         }

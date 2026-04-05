@@ -8,8 +8,6 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseUpload
 
-from second_brain.services.auth import load_credentials
-
 log = structlog.get_logger()
 
 
@@ -24,10 +22,12 @@ class DriveService:
     This is a raw API wrapper with no LangChain awareness.
     """
 
-    def __init__(self, token_path: str) -> None:
-        creds = load_credentials(token_path)
+    def __init__(self, token_path: str | None = None, *, creds: "Credentials | None" = None) -> None:
+        if creds is None:
+            from second_brain.services.auth import load_credentials
+            creds = load_credentials(token_path)
         self._service = build("drive", "v3", credentials=creds)
-        log.info("drive_service_initialized", token_path=token_path)
+        log.info("drive_service_initialized")
 
     # ------------------------------------------------------------------
     # Read operations
