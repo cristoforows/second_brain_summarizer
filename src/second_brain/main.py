@@ -24,7 +24,7 @@ def _init_agent(dry_run: bool = False) -> tuple:
     drive = DriveService(settings.google_service_refresh_token)
     init_tools(drive, settings.output_drive_folder_id, dry_run=dry_run)
     calendar = CalendarService(settings.google_service_refresh_token)
-    init_calendar_tools(calendar, settings.google_calendar_id)
+    init_calendar_tools(calendar, settings.google_calendar_id, dry_run=dry_run)
     llm = create_llm(settings)
     tools = get_all_tools() + get_all_calendar_tools()
     agent = build_agent(llm, tools)

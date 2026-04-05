@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any
 
 import structlog
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-from second_brain.services.drive import _load_credentials
+from second_brain.services.auth import load_credentials
 
 log = structlog.get_logger()
 
@@ -19,7 +19,7 @@ class CalendarService:
     """
 
     def __init__(self, token_path: str) -> None:
-        creds = _load_credentials(token_path)
+        creds = load_credentials(token_path)
         self._service = build("calendar", "v3", credentials=creds)
         log.info("calendar_service_initialized", token_path=token_path)
 
