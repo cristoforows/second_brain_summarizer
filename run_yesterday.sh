@@ -11,5 +11,10 @@ for i in $(seq 1 60); do
   sleep 1
 done
 
+# Always run from main, then restore the original branch
+ORIGINAL_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+git checkout main && git pull --ff-only origin main
+trap 'git checkout "$ORIGINAL_BRANCH"' EXIT
+
 YESTERDAY=$(date -v-1d +%Y-%m-%d)
 .venv/bin/second-brain --date "$YESTERDAY"

@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     telegram_outbound_url: str = ""
     telegram_outbound_secret: str = ""
     telegram_chat_id: str = ""
+    google_calendar_id: str = "primary"
 
     # --- Non-secrets (from config.yaml) ---
     llm: LLMConfig = Field(default_factory=LLMConfig)

@@ -13,9 +13,11 @@ import structlog
 from second_brain.agent.agent import build_agent, run_agent, run_agent_index, run_agent_with_prompt
 from second_brain.agent.llm import create_llm
 from second_brain.core.config import get_settings
+from second_brain.services.calendar import CalendarService
 from second_brain.services.drive import DriveService
 from second_brain.services.telegram import TelegramService
 from second_brain.tools import drive_tools, telegram_tools
+from second_brain.tools.calendar_tools import get_all_calendar_tools, init_calendar_tools
 from second_brain.tools.drive_tools import init_tools
 from second_brain.utils.parser import parse_dump
 
@@ -99,15 +101,17 @@ def _get_active_todos(drive: DriveService, output_folder_id: str) -> str | None:
 
 
 def _init_agent(dry_run: bool = False) -> tuple:
-    """Initialize Drive, tools, and agent. Shared by all pipeline entry points."""
+    """Initialize Drive, Calendar, tools, and agent. Shared by all pipeline entry points."""
     settings = get_settings()
     drive = DriveService(settings.google_service_refresh_token)
     init_tools(drive, settings.output_drive_folder_id, dry_run=dry_run)
     if settings.telegram_outbound_url and settings.telegram_outbound_secret:
         telegram = TelegramService(settings.telegram_outbound_url, settings.telegram_outbound_secret)
         telegram_tools.init_tools(telegram, settings.telegram_chat_id, dry_run=dry_run)
+    calendar = CalendarService(settings.google_service_refresh_token)
+    init_calendar_tools(calendar, settings.google_calendar_id)
     llm = create_llm(settings)
-    tools = drive_tools.get_all_tools() + telegram_tools.get_all_tools()
+    tools = drive_tools.get_all_tools() + telegram_tools.get_all_tools() + get_all_calendar_tools()
     agent = build_agent(llm, tools)
     return settings, drive, agent
 
