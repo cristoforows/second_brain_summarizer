@@ -14,7 +14,8 @@ done
 
 # Always run from main, then restore the original branch
 ORIGINAL_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-git checkout main && git pull --ff-only origin main
+git checkout main || { echo "Failed to checkout main"; exit 1; }
+git pull --ff-only origin main || { echo "Failed to pull main (diverged history?)"; exit 1; }
 
 # Restore branch on normal exit, TERM (launchd kill), or INT (Ctrl-C)
 trap 'restore_branch' EXIT

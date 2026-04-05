@@ -9,8 +9,6 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseUpload
 
-from second_brain.services.auth import load_credentials
-
 log = structlog.get_logger()
 
 
@@ -25,8 +23,10 @@ class DriveService:
     This is a raw API wrapper with no LangChain awareness.
     """
 
-    def __init__(self, token_path: str) -> None:
-        creds = load_credentials(token_path)
+    def __init__(self, token_path: str | None = None, *, creds: "Credentials | None" = None) -> None:
+        if creds is None:
+            from second_brain.services.auth import load_credentials
+            creds = load_credentials(token_path)
         self._service = build("drive", "v3", credentials=creds)
         # googleapiclient's underlying httplib2.Http holds a single SSL socket
         # that is not thread-safe. LangGraph dispatches parallel tool calls,
@@ -34,6 +34,7 @@ class DriveService:
         self._lock = threading.Lock()
         self._reads: list[str] = []
         self._updates: list[str] = []
+        log.info("drive_service_initialized")
 
     # ------------------------------------------------------------------
     # Read operations
