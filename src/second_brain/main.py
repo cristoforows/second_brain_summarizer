@@ -109,7 +109,7 @@ def _init_agent(dry_run: bool = False) -> tuple:
         telegram = TelegramService(settings.telegram_outbound_url, settings.telegram_outbound_secret)
         telegram_tools.init_tools(telegram, settings.telegram_chat_id, dry_run=dry_run)
     calendar = CalendarService(settings.google_service_refresh_token)
-    init_calendar_tools(calendar, settings.google_calendar_id)
+    init_calendar_tools(calendar, settings.google_calendar_id, dry_run=dry_run)
     llm = create_llm(settings)
     tools = drive_tools.get_all_tools() + telegram_tools.get_all_tools() + get_all_calendar_tools()
     agent = build_agent(llm, tools)

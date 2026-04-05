@@ -11,16 +11,18 @@ log = structlog.get_logger()
 
 _calendar: CalendarService | None = None
 _calendar_id: str = "primary"
+_dry_run: bool = False
 
 
-def init_calendar_tools(calendar: CalendarService, calendar_id: str) -> None:
+def init_calendar_tools(calendar: CalendarService, calendar_id: str, dry_run: bool = False) -> None:
     """Initialize the module with a CalendarService instance.
 
     Must be called before any tool is invoked.
     """
-    global _calendar, _calendar_id
+    global _calendar, _calendar_id, _dry_run
     _calendar = calendar
     _calendar_id = calendar_id
+    _dry_run = dry_run
 
 
 def _get_calendar() -> CalendarService:
@@ -84,6 +86,9 @@ def create_event(
 
     Returns the new event ID.
     """
+    if _dry_run:
+        log.info("dry_run_skip", action="create_event", title=title)
+        return f"[dry-run] Would create event '{title}'."
     cal = _get_calendar()
     event_id = cal.create_event(
         _calendar_id,
@@ -117,6 +122,9 @@ def update_event(
         description: New description (leave empty to keep existing).
         location: New location (leave empty to keep existing).
     """
+    if _dry_run:
+        log.info("dry_run_skip", action="update_event", event_id=event_id)
+        return f"[dry-run] Would update event {event_id}."
     cal = _get_calendar()
     cal.update_event(
         _calendar_id,
@@ -139,6 +147,9 @@ def delete_event(event_id: str) -> str:
     Args:
         event_id: The ID of the event to delete.
     """
+    if _dry_run:
+        log.info("dry_run_skip", action="delete_event", event_id=event_id)
+        return f"[dry-run] Would delete event {event_id}."
     cal = _get_calendar()
     cal.delete_event(_calendar_id, event_id)
     return f"Deleted event {event_id}."
