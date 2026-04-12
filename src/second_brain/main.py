@@ -44,33 +44,27 @@ def run_pipeline(date_str: str | None = None, dry_run: bool = False) -> None:
     # --- Find today's dump file ---
     dump_filename = f"{date_str}.md"
     dump_file = drive.find_file(settings.input_drive_folder_id, dump_filename)
+
+    messages = []
     if dump_file is None:
-        log.warning("no_dump_file_found", filename=dump_filename)
-        print(f"No dump file found for {date_str} — nothing to process.")
-        return
-
-    log.info("dump_file_found", file_id=dump_file["id"], name=dump_file["name"])
-
-    # --- Parse messages ---
-    raw_content = drive.read_file_raw(dump_file["id"])
-    messages = parse_dump(raw_content)
-
-    if not messages:
-        log.warning("no_messages_parsed", filename=dump_filename)
-        print(f"Dump file {dump_filename} contained no messages.")
-        return
-
-    log.info("messages_parsed", count=len(messages))
+        log.info("no_dump_file_found", filename=dump_filename)
+    else:
+        log.info("dump_file_found", file_id=dump_file["id"], name=dump_file["name"])
+        raw_content = drive.read_file_raw(dump_file["id"])
+        messages = parse_dump(raw_content)
 
     # --- Run agent ---
-    result = run_agent(agent, messages)
-
-    log.info(
-        "pipeline_complete",
-        date=date_str,
-        messages_processed=len(messages),
-    )
-    print(f"Processed {len(messages)} messages from {dump_filename}.")
+    if messages:
+        log.info("messages_parsed", count=len(messages))
+        run_agent(agent, messages)
+        log.info("pipeline_complete", date=date_str, messages_processed=len(messages))
+        print(f"Processed {len(messages)} messages from {dump_filename}.")
+    else:
+        log.info("no_messages_running_todo_maintenance", date=date_str)
+        from second_brain.agent.prompts import TODO_MAINTENANCE_PROMPT
+        run_agent_with_prompt(agent, TODO_MAINTENANCE_PROMPT)
+        log.info("todo_maintenance_complete", date=date_str)
+        print(f"No messages for {date_str} — ran to-do maintenance.")
 
 
 def main() -> None:

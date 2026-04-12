@@ -4,8 +4,8 @@ llm:
     order:
       - "minimax/fp8"
     allow_fallbacks: false
-  temperature: 0.3
-  max_tokens: 4096
+  temperature: 0.5
+  max_tokens: 16000
 
 seed_categories:
   - name: "work"

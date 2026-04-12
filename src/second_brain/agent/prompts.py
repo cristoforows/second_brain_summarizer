@@ -42,6 +42,11 @@ Each level has its own `directory.md`:
    category. If the file already exists, read it first (`read_file`) and merge the
    new content in. New files can be written directly.
 
+   **Before finalizing the write**, re-read the section's `directory.md` notes for
+   the target file. It may contain file-specific update rules (e.g. updating summary
+   tables, record sections, or counts). Apply all such rules to your merged content
+   before writing. Do not skip this even if you already read the directory earlier.
+
 6. **Create topic folders when needed** — if no existing topic folder fits, create one
    inside the appropriate section: `create_new_category("{{section}}/{{topic}}")`.
 
@@ -56,22 +61,20 @@ Each level has its own `directory.md`:
 
 ## To-Do Handling
 
-For every batch of messages, also scan for **action items** — tasks, reminders, errands,
-follow-ups, or appointments, whether stated explicitly or implied by context.
+Scan every batch of messages for **action items** — tasks, reminders, errands, follow-ups.
 
-1. **Load the format spec** — call `read_category_summary("to-do")` to read `to-do/directory.md`.
-   It defines the exact task syntax, carry-over rules, and archiving rules. Follow them strictly.
+1. **Read `to-do/directory.md` first** — call `read_category_summary("to-do")` before any
+   to-do work. It defines the task format, carry-over rules, and archiving rules. Follow them
+   strictly. The `## YYYY-MM-DD` date-heading guideline below does NOT apply to `to-do/to-do.md`
+   — use the section structure defined in the directory.
 
-2. **Update `to-do/to-do.md`** — read the file first (`read_file("to-do", "to-do.md")`), then
-   append new tasks. Add deadlines and priority markers when they can be inferred from the message.
+2. **Add new tasks** — read `to-do/to-do.md`, then append under `## Today`.
 
-3. **Dual record** — if a task clearly belongs to a project or area, also add it as a linked
-   action item in that document (e.g. under `## Actions` or `## Next Steps`). Cross-link both
-   ways. Only do this when the connection is unambiguous — do not force it.
+3. **Archive completed tasks** — every run, check `to-do/to-do.md` for `[x]` items and
+   follow the archiving rule in the directory. Update any linked project or area file too.
 
-4. **Archive on completion** — if a message indicates a task was completed, follow the archiving
-   rule in `to-do/directory.md`: move the item to `archives/completed-to-dos/`, remove it from
-   `to-do/to-do.md`, and update any linked project or area file to reflect the completion.
+4. **Dual record** — if a task clearly belongs to a project or area, also add it as a linked
+   action item in that document. Cross-link both ways. Only when the connection is unambiguous.
 
 ## Guidelines
 
@@ -89,6 +92,9 @@ follow-ups, or appointments, whether stated explicitly or implied by context.
 - **Cross-reference related content.** When a note references another topic or file,
   link to it using Markdown syntax: `[label](relative/path/to/file.md)`. This keeps
   the knowledge base navigable.
+- **Obey file-specific rules in directory.md.** Section directory files may contain
+  per-file instructions (e.g. "update the Personal Record table", "update status
+  counts"). These are mandatory — re-check them before every write to that file.
 
 ## Messages to process
 
@@ -116,6 +122,19 @@ anything in the knowledge base.
   relevant `directory.md` files via `update_category_summary` or `update_directory_index`.
 - **Summarize changes.** After completing the request, report a brief summary of what
   was created, modified, or moved.
+"""
+
+TODO_MAINTENANCE_PROMPT = """\
+You are a Second Brain assistant performing daily to-do maintenance.
+
+1. Call `read_category_summary("to-do")` to load the format spec and archiving rules.
+2. Call `read_file("to-do", "to-do.md")` to read the current to-do list.
+3. If there are completed tasks (`[x]`), follow the archiving rule in `to-do/directory.md`:
+   move them to the appropriate archive file, then remove them from `to-do/to-do.md`.
+4. Apply the carry-over rule from `to-do/directory.md`.
+5. Report what you did.
+
+If there are no completed tasks and nothing to carry over, just report that.
 """
 
 
