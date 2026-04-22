@@ -65,7 +65,7 @@ def read_directory_index() -> str:
     result = drive.find_file(_output_folder_id, "directory.md")
     if result is None:
         return "directory.md does not exist yet. This is a fresh knowledge base."
-    return drive.read_file_raw(result["id"])
+    return drive.read_file_raw(result["id"], "directory.md")
 
 
 @tool
@@ -87,7 +87,7 @@ def read_category_summary(category_name: str) -> str:
     summary = drive.find_file(folder_id, "directory.md")
     if summary is None:
         return f"'{category_name}' exists but has no directory.md yet."
-    return drive.read_file_raw(summary["id"])
+    return drive.read_file_raw(summary["id"], f"{category_name}/directory.md")
 
 
 @tool
@@ -109,7 +109,7 @@ def read_file(category_name: str, filename: str) -> str:
     file_info = drive.find_file(folder_id, filename)
     if file_info is None:
         return f"File '{filename}' not found in '{category_name}'."
-    return drive.read_file_raw(file_info["id"])
+    return drive.read_file_raw(file_info["id"], f"{category_name}/{filename}")
 
 
 @tool
@@ -139,7 +139,7 @@ def write_to_category(category_name: str, filename: str, content: str) -> str:
         log.info("dry_run_skip", action=action, file=filename, category=category_name)
         return f"[dry-run] Would {action} '{filename}' in '{category_name}'."
     if existing:
-        drive.update_file(existing["id"], content)
+        drive.update_file(existing["id"], content, f"{category_name}/{filename}")
         return f"Updated '{filename}' in '{category_name}'."
     else:
         drive.write_file(folder_id, filename, content)
@@ -171,7 +171,7 @@ def update_category_summary(category_name: str, summary: str) -> str:
         log.info("dry_run_skip", action=action, file="directory.md", category=category_name)
         return f"[dry-run] Would {action} directory.md for '{category_name}'."
     if existing:
-        drive.update_file(existing["id"], summary)
+        drive.update_file(existing["id"], summary, f"{category_name}/directory.md")
         return f"Updated directory for '{category_name}'."
     else:
         drive.write_file(folder_id, "directory.md", summary)
@@ -194,7 +194,7 @@ def update_directory_index(content: str) -> str:
         log.info("dry_run_skip", action=action, file="directory.md", category="root")
         return f"[dry-run] Would {action} root directory.md."
     if existing:
-        drive.update_file(existing["id"], content)
+        drive.update_file(existing["id"], content, "directory.md")
         return "Updated directory.md."
     else:
         drive.write_file(_output_folder_id, "directory.md", content)

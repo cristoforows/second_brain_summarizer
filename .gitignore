@@ -27,3 +27,6 @@ token.json
 
 # OS
 .DS_Store
+
+# Per-run log files
+tmp/

@@ -9,12 +9,12 @@ from second_brain.services.drive import DriveService
 
 @pytest.fixture
 def drive() -> DriveService:
-    """Create a DriveService with mocked Google credentials and API client."""
+    """Create a DriveService with mocked credentials loading and API client."""
     with (
-        patch("second_brain.services.drive.Credentials") as mock_creds,
+        patch("second_brain.services.drive._load_credentials") as mock_load,
         patch("second_brain.services.drive.build") as mock_build,
     ):
-        mock_creds.from_service_account_file.return_value = MagicMock()
+        mock_load.return_value = MagicMock()
         service = DriveService("/fake/path.json")
         # Expose the mock service object for per-test configuration
         service._mock_api = mock_build.return_value
@@ -62,7 +62,7 @@ class TestReadFile:
         files_mock = drive._mock_api.files.return_value
         files_mock.export.return_value.execute.return_value = b"# Hello"
 
-        content = drive.read_file("file-123")
+        content = drive.read_file("file-123", "fake/path.md")
         assert content == "# Hello"
 
 
@@ -71,7 +71,7 @@ class TestReadFileRaw:
         files_mock = drive._mock_api.files.return_value
         files_mock.get_media.return_value.execute.return_value = b"raw content"
 
-        content = drive.read_file_raw("file-123")
+        content = drive.read_file_raw("file-123", "fake/path.md")
         assert content == "raw content"
 
 
@@ -108,7 +108,7 @@ class TestUpdateFile:
         files_mock = drive._mock_api.files.return_value
         files_mock.update.return_value.execute.return_value = {}
 
-        drive.update_file("file-123", "updated content")
+        drive.update_file("file-123", "updated content", "fake/path.md")
         files_mock.update.assert_called_once()
 
 

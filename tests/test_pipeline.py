@@ -45,7 +45,7 @@ def test_full_pipeline(
     mock_drive_cls.assert_called_once_with("/fake/sa.json")
     mock_init_tools.assert_called_once_with(drive, "output-folder")
     drive.find_file.assert_called_once_with("input-folder", "2025-03-01")
-    drive.read_file_raw.assert_called_once_with("dump-id")
+    drive.read_file_raw.assert_called_once_with("dump-id", "2025-03-01.md")
     mock_create_llm.assert_called_once_with(settings)
     mock_build_agent.assert_called_once()
     mock_run_agent.assert_called_once()

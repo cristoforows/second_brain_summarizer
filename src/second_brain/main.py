@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import argparse
 import logging
+import secrets
+import string
 from datetime import datetime, timezone
+from pathlib import Path
 
 import structlog
 
@@ -41,30 +44,33 @@ def run_pipeline(date_str: str | None = None, dry_run: bool = False) -> None:
 
     log.info("pipeline_start", date=date_str)
 
-    # --- Find today's dump file ---
-    dump_filename = f"{date_str}.md"
-    dump_file = drive.find_file(settings.input_drive_folder_id, dump_filename)
+    try:
+        # --- Find today's dump file ---
+        dump_filename = f"{date_str}.md"
+        dump_file = drive.find_file(settings.input_drive_folder_id, dump_filename)
 
-    messages = []
-    if dump_file is None:
-        log.info("no_dump_file_found", filename=dump_filename)
-    else:
-        log.info("dump_file_found", file_id=dump_file["id"], name=dump_file["name"])
-        raw_content = drive.read_file_raw(dump_file["id"])
-        messages = parse_dump(raw_content)
+        messages = []
+        if dump_file is None:
+            log.info("no_dump_file_found", filename=dump_filename)
+        else:
+            log.info("dump_file_found", file_id=dump_file["id"], name=dump_file["name"])
+            raw_content = drive.read_file_raw(dump_file["id"], dump_filename)
+            messages = parse_dump(raw_content)
 
-    # --- Run agent ---
-    if messages:
-        log.info("messages_parsed", count=len(messages))
-        run_agent(agent, messages)
-        log.info("pipeline_complete", date=date_str, messages_processed=len(messages))
-        print(f"Processed {len(messages)} messages from {dump_filename}.")
-    else:
-        log.info("no_messages_running_todo_maintenance", date=date_str)
-        from second_brain.agent.prompts import TODO_MAINTENANCE_PROMPT
-        run_agent_with_prompt(agent, TODO_MAINTENANCE_PROMPT)
-        log.info("todo_maintenance_complete", date=date_str)
-        print(f"No messages for {date_str} — ran to-do maintenance.")
+        # --- Run agent ---
+        if messages:
+            log.info("messages_parsed", count=len(messages))
+            run_agent(agent, messages)
+            log.info("pipeline_complete", date=date_str, messages_processed=len(messages))
+            print(f"Processed {len(messages)} messages from {dump_filename}.")
+        else:
+            log.info("no_messages_running_todo_maintenance", date=date_str)
+            from second_brain.agent.prompts import TODO_MAINTENANCE_PROMPT
+            run_agent_with_prompt(agent, TODO_MAINTENANCE_PROMPT)
+            log.info("todo_maintenance_complete", date=date_str)
+            print(f"No messages for {date_str} — ran to-do maintenance.")
+    finally:
+        drive.log_run_summary()
 
 
 def main() -> None:
@@ -108,7 +114,8 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    _configure_logging(verbose=args.verbose)
+    log_path = _configure_logging(verbose=args.verbose, date_str=args.date)
+    log.info("log_file", path=str(log_path))
 
     if args.dry_run:
         log.info("dry_run_mode_enabled")
@@ -122,36 +129,83 @@ def main() -> None:
         run_pipeline(date_str=args.date, dry_run=args.dry_run)
 
 
-def _configure_logging(verbose: bool = False) -> None:
-    """Configure structlog with the appropriate log level.
+def _configure_logging(verbose: bool = False, date_str: str | None = None) -> Path:
+    """Configure structlog + stdlib logging.
 
-    Default level is INFO, which logs pipeline milestones.
-    Verbose mode (DEBUG) additionally logs agent reasoning steps,
-    tool calls, and tool results.
+    Console respects --verbose (INFO by default, DEBUG when set).
+    A DEBUG-level file log is always written to ``tmp/<run_id><date>.log``
+    at the project root, so local runs leave a per-run trace on disk.
+    Returns the log file path.
     """
-    level = logging.DEBUG if verbose else logging.INFO
+    console_level = logging.DEBUG if verbose else logging.INFO
+
+    alphabet = string.ascii_lowercase + string.digits
+    run_id = "".join(secrets.choice(alphabet) for _ in range(4))
+    date_part = date_str or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    project_root = Path(__file__).resolve().parents[2]
+    tmp_dir = project_root / "tmp"
+    tmp_dir.mkdir(exist_ok=True)
+    log_path = tmp_dir / f"{run_id}{date_part}.log"
+
+    shared_processors = [
+        structlog.contextvars.merge_contextvars,
+        structlog.processors.add_log_level,
+        structlog.processors.TimeStamper(fmt="iso"),
+    ]
 
     structlog.configure(
-        wrapper_class=structlog.make_filtering_bound_logger(level),
-        processors=[
-            structlog.contextvars.merge_contextvars,
-            structlog.processors.add_log_level,
-            structlog.processors.TimeStamper(fmt="iso"),
-            structlog.dev.ConsoleRenderer(),
-        ],
+        wrapper_class=structlog.make_filtering_bound_logger(logging.DEBUG),
+        processors=shared_processors
+        + [structlog.stdlib.ProcessorFormatter.wrap_for_formatter],
+        logger_factory=structlog.stdlib.LoggerFactory(),
     )
+
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(console_level)
+    console_handler.setFormatter(
+        structlog.stdlib.ProcessorFormatter(
+            foreign_pre_chain=shared_processors,
+            processor=structlog.dev.ConsoleRenderer(),
+        )
+    )
+
+    file_handler = logging.FileHandler(log_path, encoding="utf-8")
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(
+        structlog.stdlib.ProcessorFormatter(
+            foreign_pre_chain=shared_processors,
+            processor=structlog.dev.ConsoleRenderer(colors=False),
+        )
+    )
+
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG)
+    root.handlers.clear()
+    root.addHandler(console_handler)
+    root.addHandler(file_handler)
+
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("googleapiclient.discovery_cache").setLevel(logging.ERROR)
+
+    return log_path
 
 
 def _run_prompt(prompt: str, dry_run: bool = False) -> None:
     """Initialize tools and run the agent with a custom user prompt."""
-    _, _, agent = _init_agent(dry_run=dry_run)
-    run_agent_with_prompt(agent, prompt)
+    _, drive, agent = _init_agent(dry_run=dry_run)
+    try:
+        run_agent_with_prompt(agent, prompt)
+    finally:
+        drive.log_run_summary()
 
 
 def _run_index(changed_files: list[str] | None = None, dry_run: bool = False) -> None:
     """Initialize tools and run the indexer to rebuild directory.md files."""
-    _, _, agent = _init_agent(dry_run=dry_run)
-    run_agent_index(agent, changed_files)
+    _, drive, agent = _init_agent(dry_run=dry_run)
+    try:
+        run_agent_index(agent, changed_files)
+    finally:
+        drive.log_run_summary()
 
 
 

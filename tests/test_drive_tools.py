@@ -250,7 +250,7 @@ class TestWriteToCategory:
             {"category_name": "work", "filename": "old.md", "content": "updated"}
         )
         assert "Updated" in result
-        _drive().update_file.assert_called_once_with("existing-id", "updated")
+        _drive().update_file.assert_called_once_with("existing-id", "updated", "work/old.md")
 
     def test_nested_path_creates_file(self) -> None:
         _drive().find_file.side_effect = [
@@ -306,7 +306,7 @@ class TestUpdateCategorySummary:
             {"category_name": "work", "summary": "updated"}
         )
         assert "Updated directory" in result
-        _drive().update_file.assert_called_once_with("summary-id", "updated")
+        _drive().update_file.assert_called_once_with("summary-id", "updated", "work/directory.md")
 
 
 # ------------------------------------------------------------------
@@ -325,7 +325,7 @@ class TestUpdateDirectoryIndex:
         _drive().find_file.return_value = {"id": "dir-id"}
         result = update_directory_index.invoke({"content": "# Dir updated"})
         assert "Updated" in result
-        _drive().update_file.assert_called_once_with("dir-id", "# Dir updated")
+        _drive().update_file.assert_called_once_with("dir-id", "# Dir updated", "directory.md")
 
 
 # ------------------------------------------------------------------
