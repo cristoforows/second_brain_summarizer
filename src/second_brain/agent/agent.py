@@ -51,12 +51,12 @@ def run_agent_with_prompt(agent: Any, prompt: str) -> dict:
 
 
 def run_agent_index(agent: Any, changed_files: list[str] | None = None) -> dict:
-    """Invoke the agent to rebuild directory.md files across the knowledge base.
+    """Invoke the agent to rebuild Directory.yaml files across the knowledge base.
 
     Args:
         changed_files: Optional list of slash-separated file paths that were
-            recently added or modified (e.g. ["projects/dashboard/notes.md"]).
-            When provided, the agent focuses on updating directory.md files
+            recently added or modified (e.g. ["projects/dashboard/Overview.md"]).
+            When provided, the agent focuses on updating Directory.yaml files
             along those paths rather than doing a full crawl.
     """
     system_prompt = build_index_prompt(changed_files)

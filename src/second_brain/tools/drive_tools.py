@@ -55,39 +55,38 @@ def _resolve_folder(path: str) -> str:
 
 @tool
 def read_directory_index() -> str:
-    """Read the directory.md file from the output folder to understand existing sections and structure.
+    """Read the root Directory.yaml to understand the knowledge base sections and structure.
 
-    Call this first to learn what sections exist and how the knowledge base
-    is organized before making any changes. Returns the content of directory.md,
+    Call this first before making any changes. Returns the YAML content of Directory.yaml,
     or a message indicating it doesn't exist yet.
     """
     drive = _get_drive()
-    result = drive.find_file(_output_folder_id, "directory.md")
+    result = drive.find_file(_output_folder_id, "Directory.yaml")
     if result is None:
-        return "directory.md does not exist yet. This is a fresh knowledge base."
-    return drive.read_file_raw(result["id"], "directory.md")
+        return "Directory.yaml does not exist yet. This is a fresh knowledge base."
+    return drive.read_file_raw(result["id"], "Directory.yaml")
 
 
 @tool
 def read_category_summary(category_name: str) -> str:
-    """Read the directory.md for a section or topic folder.
+    """Read the Directory.yaml for a section or topic folder.
 
     Args:
         category_name: Slash-separated path to the folder (e.g. "projects" or
             "projects/dashboard-redesign").
 
-    Returns the content of directory.md inside the target folder, or a message
-    if the folder or file doesn't exist.
+    Returns the YAML content of Directory.yaml inside the target folder, or a
+    message if the folder or file doesn't exist.
     """
     drive = _get_drive()
     try:
         folder_id = _resolve_folder(category_name)
     except ValueError:
         return f"Path '{category_name}' does not exist."
-    summary = drive.find_file(folder_id, "directory.md")
+    summary = drive.find_file(folder_id, "Directory.yaml")
     if summary is None:
-        return f"'{category_name}' exists but has no directory.md yet."
-    return drive.read_file_raw(summary["id"], f"{category_name}/directory.md")
+        return f"'{category_name}' exists but has no Directory.yaml yet."
+    return drive.read_file_raw(summary["id"], f"{category_name}/Directory.yaml")
 
 
 @tool
@@ -99,7 +98,7 @@ def read_file(category_name: str, filename: str) -> str:
 
     Args:
         category_name: Slash-separated path to the folder (e.g. "projects/dashboard-redesign").
-        filename: Name of the file to read (e.g., "notes.md").
+        filename: Name of the file to read (e.g., "Overview.md").
     """
     drive = _get_drive()
     try:
@@ -122,7 +121,8 @@ def write_to_category(category_name: str, filename: str, content: str) -> str:
 
     Args:
         category_name: Slash-separated path to the folder (e.g. "projects/dashboard-redesign").
-        filename: Descriptive kebab-case filename (e.g., "running-log.md").
+        filename: Title-Case filename (e.g., "Running-Log.md"). Use "Overview.md" for the
+            primary note in a projects or resources topic folder.
         content: Full markdown content to write.
     """
     drive = _get_drive()
@@ -148,14 +148,14 @@ def write_to_category(category_name: str, filename: str, content: str) -> str:
 
 @tool
 def update_category_summary(category_name: str, summary: str) -> str:
-    """Update (or create) the directory.md for a section or topic folder.
+    """Update (or create) the Directory.yaml for a section or topic folder.
 
     Call this after writing files or creating topic folders to keep the
-    section's directory.md current.
+    section's Directory.yaml current.
 
     Args:
         category_name: Slash-separated path to the folder (e.g. "projects").
-        summary: Full markdown content for directory.md.
+        summary: Full YAML content for Directory.yaml.
     """
     drive = _get_drive()
     try:
@@ -165,40 +165,40 @@ def update_category_summary(category_name: str, summary: str) -> str:
             f"Path '{category_name}' does not exist. "
             f"Create it first with create_new_category."
         )
-    existing = drive.find_file(folder_id, "directory.md")
+    existing = drive.find_file(folder_id, "Directory.yaml")
     if _dry_run:
         action = "update" if existing else "create"
-        log.info("dry_run_skip", action=action, file="directory.md", category=category_name)
-        return f"[dry-run] Would {action} directory.md for '{category_name}'."
+        log.info("dry_run_skip", action=action, file="Directory.yaml", category=category_name)
+        return f"[dry-run] Would {action} Directory.yaml for '{category_name}'."
     if existing:
-        drive.update_file(existing["id"], summary, f"{category_name}/directory.md")
+        drive.update_file(existing["id"], summary, f"{category_name}/Directory.yaml")
         return f"Updated directory for '{category_name}'."
     else:
-        drive.write_file(folder_id, "directory.md", summary)
+        drive.write_file(folder_id, "Directory.yaml", summary)
         return f"Created directory for '{category_name}'."
 
 
 @tool
 def update_directory_index(content: str) -> str:
-    """Update the root directory.md that lists all sections and their descriptions.
+    """Update the root Directory.yaml that lists all sections and their descriptions.
 
     Call this only when the overall section structure changes.
 
     Args:
-        content: Full markdown content for directory.md.
+        content: Full YAML content for Directory.yaml.
     """
     drive = _get_drive()
-    existing = drive.find_file(_output_folder_id, "directory.md")
+    existing = drive.find_file(_output_folder_id, "Directory.yaml")
     if _dry_run:
         action = "update" if existing else "create"
-        log.info("dry_run_skip", action=action, file="directory.md", category="root")
-        return f"[dry-run] Would {action} root directory.md."
+        log.info("dry_run_skip", action=action, file="Directory.yaml", category="root")
+        return f"[dry-run] Would {action} root Directory.yaml."
     if existing:
-        drive.update_file(existing["id"], content, "directory.md")
-        return "Updated directory.md."
+        drive.update_file(existing["id"], content, "Directory.yaml")
+        return "Updated Directory.yaml."
     else:
-        drive.write_file(_output_folder_id, "directory.md", content)
-        return "Created directory.md."
+        drive.write_file(_output_folder_id, "Directory.yaml", content)
+        return "Created Directory.yaml."
 
 
 @tool
@@ -206,7 +206,7 @@ def list_folder(path: str = "") -> str:
     """List all files and subfolders at a given path in the knowledge base.
 
     Use this during indexing to discover the actual contents of a folder
-    rather than relying on potentially stale directory.md files.
+    rather than relying on potentially stale Directory.yaml files.
 
     Args:
         path: Slash-separated path to the folder (e.g. "projects" or
@@ -249,7 +249,7 @@ def create_new_category(category_name: str) -> str:
     """Create a new topic folder inside a section, or a new section at the root.
 
     Use this when no existing topic folder fits a message. After creating the
-    folder, update the section's directory.md via update_category_summary.
+    folder, update the section's Directory.yaml via update_category_summary.
 
     Args:
         category_name: Slash-separated path for the new folder

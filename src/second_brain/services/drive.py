@@ -230,7 +230,7 @@ class DriveService:
     def update_file(self, file_id: str, content: str, display_path: str) -> None:
         """Overwrite the content of an existing file.
 
-        ``display_path`` is a human-readable identifier like ``notes/directory.md``
+        ``display_path`` is a human-readable identifier like ``notes/Directory.yaml``
         used only for logging.
         """
         media = MediaIoBaseUpload(

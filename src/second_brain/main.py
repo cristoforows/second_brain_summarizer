@@ -93,7 +93,7 @@ def main() -> None:
     parser.add_argument(
         "--index",
         action="store_true",
-        help="Rebuild directory.md files across the knowledge base.",
+        help="Rebuild Directory.yaml files across the knowledge base.",
     )
     parser.add_argument(
         "--changed",
@@ -200,7 +200,7 @@ def _run_prompt(prompt: str, dry_run: bool = False) -> None:
 
 
 def _run_index(changed_files: list[str] | None = None, dry_run: bool = False) -> None:
-    """Initialize tools and run the indexer to rebuild directory.md files."""
+    """Initialize tools and run the indexer to rebuild Directory.yaml files."""
     _, drive, agent = _init_agent(dry_run=dry_run)
     try:
         run_agent_index(agent, changed_files)
