@@ -25,6 +25,19 @@ def get_all_tools() -> list:
     return [send_telegram_message]
 
 
+def send_notification(text: str) -> None:
+    """Send a message to the default chat_id, silently skipping if Telegram isn't configured."""
+    if not _telegram or not _default_chat_id:
+        return
+    if _dry_run:
+        log.info("telegram_notification_dry_run", text=text[:100])
+        return
+    try:
+        _telegram.send_message(_default_chat_id, text)
+    except Exception as e:
+        log.error("telegram_notification_failed", error=str(e))
+
+
 @tool
 def send_telegram_message(text: str, chat_id: str = "") -> str:
     """Send a message to the user via Telegram.
