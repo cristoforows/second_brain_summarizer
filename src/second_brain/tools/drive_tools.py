@@ -98,7 +98,7 @@ def read_file(category_name: str, filename: str) -> str:
 
     Args:
         category_name: Slash-separated path to the folder (e.g. "projects/dashboard-redesign").
-        filename: Name of the file to read (e.g., "Overview.md").
+        filename: Name of the file to read (e.g., "Job Search.md").
     """
     drive = _get_drive()
     try:
@@ -121,8 +121,8 @@ def write_to_category(category_name: str, filename: str, content: str) -> str:
 
     Args:
         category_name: Slash-separated path to the folder (e.g. "projects/dashboard-redesign").
-        filename: Title-Case filename (e.g., "Running-Log.md"). Use "Overview.md" for the
-            primary note in a projects or resources topic folder.
+        filename: Title-Case filename (e.g., "Running-Log.md"). For the primary note in a
+            projects or resources topic folder, use the folder name (e.g. "Job Search.md").
         content: Full markdown content to write.
     """
     drive = _get_drive()

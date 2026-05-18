@@ -55,7 +55,7 @@ def run_agent_index(agent: Any, changed_files: list[str] | None = None) -> dict:
 
     Args:
         changed_files: Optional list of slash-separated file paths that were
-            recently added or modified (e.g. ["projects/dashboard/Overview.md"]).
+            recently added or modified (e.g. ["projects/job-search/Job Search.md"]).
             When provided, the agent focuses on updating Directory.yaml files
             along those paths rather than doing a full crawl.
     """

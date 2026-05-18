@@ -123,8 +123,9 @@ Scan every batch of messages for **action items** — tasks, reminders, errands,
   for all operations in that scope. Re-read it before every write if it contains
   per-file instructions (e.g. "update the Personal Record table", "update status counts").
 - **Merge, don't duplicate.** Append to existing notes rather than creating new files.
-- **Primary note is `Overview.md`.** The main note in any `projects` or `resources` topic
-  folder is always named `Overview.md`.
+- **Primary note matches the folder name.** The main note in any `projects` or `resources`
+  topic folder is named after its parent folder in Title Case (e.g. `Job Search.md` inside
+  `projects/job-search/`). Do not use `Overview.md`.
 - **Title-Case filenames.** All files use Title Case with hyphens (e.g. `Meeting-Notes.md`,
   `Running-Log.md`). The only exception is `to-do.md`, which keeps its existing name.
 - **Date new entries.** When appending to an existing note, add `## YYYY-MM-DD` before
@@ -160,8 +161,9 @@ anything in the knowledge base.
 - **Merge, don't duplicate.** Append to existing notes rather than creating new files.
 - **Read before overwriting.** Always call `read_file` before `write_to_category`.
 - **Obey `AGENTS.md`.** If a section folder has an `AGENTS.md`, its rules are mandatory.
-- **Primary note is `Overview.md`.** The main note in any `projects` or `resources` topic
-  folder is always named `Overview.md`.
+- **Primary note matches the folder name.** The main note in any `projects` or `resources`
+  topic folder is named after its parent folder in Title Case (e.g. `Job Search.md` inside
+  `projects/job-search/`). Do not use `Overview.md`.
 - **Title-Case filenames.** All files use Title Case with hyphens (e.g. `Meeting-Notes.md`,
   `Running-Log.md`). The only exception is `to-do.md`, which keeps its existing name.
 - **Date new entries.** When appending to an existing note, add `## YYYY-MM-DD` before

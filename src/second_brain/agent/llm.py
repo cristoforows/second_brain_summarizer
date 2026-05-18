@@ -18,7 +18,10 @@ def create_llm(settings: Settings) -> ChatOpenAI:
         raise ValueError(
             "OPENROUTER_API_KEY is not set. Add it to your .env file or GitHub secret."
         )
-    extra_body = {"provider": settings.llm.provider} if settings.llm.provider else {}
+    extra_body: dict = {}
+    if settings.llm.provider:
+        extra_body["provider"] = settings.llm.provider
+    extra_body["include_reasoning"] = False
     return ChatOpenAI(
         model=settings.llm.model,
         temperature=settings.llm.temperature,
@@ -26,4 +29,5 @@ def create_llm(settings: Settings) -> ChatOpenAI:
         openai_api_key=settings.openrouter_api_key,
         openai_api_base=_OPENROUTER_BASE_URL,
         extra_body=extra_body,
+        request_timeout=1800,
     )
