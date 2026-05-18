@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     google_service_refresh_token: str = "./token.json"
     input_drive_folder_id: str = ""
     output_drive_folder_id: str = ""
+    telegram_outbound_url: str = ""
+    telegram_outbound_secret: str = ""
+    telegram_chat_id: str = ""
 
     # --- Non-secrets (from config.yaml) ---
     llm: LLMConfig = Field(default_factory=LLMConfig)

@@ -13,7 +13,9 @@ from second_brain.agent.agent import build_agent, run_agent, run_agent_index, ru
 from second_brain.agent.llm import create_llm
 from second_brain.core.config import get_settings
 from second_brain.services.drive import DriveService
-from second_brain.tools.drive_tools import get_all_tools, init_tools
+from second_brain.services.telegram import TelegramService
+from second_brain.tools import drive_tools, telegram_tools
+from second_brain.tools.drive_tools import init_tools
 from second_brain.utils.parser import parse_dump
 
 log = structlog.get_logger()
@@ -24,8 +26,11 @@ def _init_agent(dry_run: bool = False) -> tuple:
     settings = get_settings()
     drive = DriveService(settings.google_service_refresh_token)
     init_tools(drive, settings.output_drive_folder_id, dry_run=dry_run)
+    if settings.telegram_outbound_url and settings.telegram_outbound_secret:
+        telegram = TelegramService(settings.telegram_outbound_url, settings.telegram_outbound_secret)
+        telegram_tools.init_tools(telegram, settings.telegram_chat_id, dry_run=dry_run)
     llm = create_llm(settings)
-    tools = get_all_tools()
+    tools = drive_tools.get_all_tools() + telegram_tools.get_all_tools()
     agent = build_agent(llm, tools)
     return settings, drive, agent
 
