@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import re
 import secrets
 import string
 from datetime import datetime, timezone
@@ -13,10 +14,54 @@ from second_brain.agent.agent import build_agent, run_agent, run_agent_index, ru
 from second_brain.agent.llm import create_llm
 from second_brain.core.config import get_settings
 from second_brain.services.drive import DriveService
-from second_brain.tools.drive_tools import get_all_tools, init_tools
+from second_brain.services.telegram import TelegramService
+from second_brain.tools import drive_tools, telegram_tools
+from second_brain.tools.drive_tools import init_tools
 from second_brain.utils.parser import parse_dump
 
 log = structlog.get_logger()
+
+
+def _format_run_summary(date_str: str, message_count: int, updates: list[str]) -> str:
+    lines = [f"📝 Second Brain · {date_str}", ""]
+    if message_count:
+        lines.append(f"📨 {message_count} message{'s' if message_count != 1 else ''} processed")
+    else:
+        lines.append("🔄 To-do maintenance")
+    if updates:
+        lines.append("")
+        lines.append("Updated:")
+        for path in updates:
+            lines.append(f"  • {path}")
+    elif not message_count:
+        lines[-1] += " — nothing changed"
+    return "\n".join(lines)
+
+
+def _get_active_todos(drive: DriveService, output_folder_id: str) -> str | None:
+    """Read the to-do file from Drive and return a formatted active task list, or None on failure."""
+    try:
+        todo_folder = drive.find_file(output_folder_id, "to-do")
+        if todo_folder is None:
+            return None
+        todo_file = drive.find_file(todo_folder["id"], "to-do.md")
+        if todo_file is None:
+            return None
+        content = drive.read_file_raw(todo_file["id"], "to-do/to-do.md")
+    except Exception as e:
+        log.error("todo_read_failed", error=str(e))
+        return None
+
+    _checkbox = re.compile(r"^\s*- \[ \]\s*")
+    _todoist = re.compile(r"\s*#todoist(?:\s+\[.*?\]\(.*?\))?")
+    tasks = [
+        "  • " + _todoist.sub("", _checkbox.sub("", line)).strip()
+        for line in content.splitlines()
+        if _checkbox.match(line)
+    ]
+    if not tasks:
+        return "📋 Active To-Dos\n\nAll clear! 🎉"
+    return "📋 Active To-Dos\n\n" + "\n".join(tasks)
 
 
 def _init_agent(dry_run: bool = False) -> tuple:
@@ -24,8 +69,11 @@ def _init_agent(dry_run: bool = False) -> tuple:
     settings = get_settings()
     drive = DriveService(settings.google_service_refresh_token)
     init_tools(drive, settings.output_drive_folder_id, dry_run=dry_run)
+    if settings.telegram_outbound_url and settings.telegram_outbound_secret:
+        telegram = TelegramService(settings.telegram_outbound_url, settings.telegram_outbound_secret)
+        telegram_tools.init_tools(telegram, settings.telegram_chat_id, dry_run=dry_run)
     llm = create_llm(settings)
-    tools = get_all_tools()
+    tools = drive_tools.get_all_tools() + telegram_tools.get_all_tools()
     agent = build_agent(llm, tools)
     return settings, drive, agent
 
@@ -69,6 +117,12 @@ def run_pipeline(date_str: str | None = None, dry_run: bool = False) -> None:
             run_agent_with_prompt(agent, TODO_MAINTENANCE_PROMPT)
             log.info("todo_maintenance_complete", date=date_str)
             print(f"No messages for {date_str} — ran to-do maintenance.")
+
+        # --- Send Telegram notifications ---
+        telegram_tools.send_notification(_format_run_summary(date_str, len(messages), drive._updates))
+        todo_msg = _get_active_todos(drive, settings.output_drive_folder_id)
+        if todo_msg:
+            telegram_tools.send_notification(todo_msg)
     finally:
         drive.log_run_summary()
 

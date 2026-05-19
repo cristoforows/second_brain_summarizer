@@ -142,7 +142,7 @@ def write_to_category(category_name: str, filename: str, content: str) -> str:
         drive.update_file(existing["id"], content, f"{category_name}/{filename}")
         return f"Updated '{filename}' in '{category_name}'."
     else:
-        drive.write_file(folder_id, filename, content)
+        drive.write_file(folder_id, filename, content, f"{category_name}/{filename}")
         return f"Created '{filename}' in '{category_name}'."
 
 
@@ -174,7 +174,7 @@ def update_category_summary(category_name: str, summary: str) -> str:
         drive.update_file(existing["id"], summary, f"{category_name}/Directory.yaml")
         return f"Updated directory for '{category_name}'."
     else:
-        drive.write_file(folder_id, "Directory.yaml", summary)
+        drive.write_file(folder_id, "Directory.yaml", summary, f"{category_name}/Directory.yaml")
         return f"Created directory for '{category_name}'."
 
 
@@ -197,7 +197,7 @@ def update_directory_index(content: str) -> str:
         drive.update_file(existing["id"], content, "Directory.yaml")
         return "Updated Directory.yaml."
     else:
-        drive.write_file(_output_folder_id, "Directory.yaml", content)
+        drive.write_file(_output_folder_id, "Directory.yaml", content, "Directory.yaml")
         return "Created Directory.yaml."
 
 

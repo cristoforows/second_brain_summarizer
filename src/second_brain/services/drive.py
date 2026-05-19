@@ -202,7 +202,7 @@ class DriveService:
     # Write operations
     # ------------------------------------------------------------------
 
-    def write_file(self, folder_id: str, name: str, content: str) -> str:
+    def write_file(self, folder_id: str, name: str, content: str, display_path: str = "") -> str:
         """Create a new file in the given folder. Returns the new file ID."""
         file_metadata = {
             "name": name,
@@ -224,7 +224,9 @@ class DriveService:
             log.error("drive_write_file_failed", name=name, folder_id=folder_id, status=e.status_code, error=str(e))
             raise
         file_id = created["id"]
-        log.info("file_created", name=name, folder_id=folder_id, file_id=file_id)
+        path = display_path or name
+        log.info("file_created", path=path, file_id=file_id, folder_id=folder_id)
+        self._updates.append(path)
         return file_id
 
     def update_file(self, file_id: str, content: str, display_path: str) -> None:
