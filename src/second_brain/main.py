@@ -53,8 +53,9 @@ def _get_active_todos(drive: DriveService, output_folder_id: str) -> str | None:
         return None
 
     _checkbox = re.compile(r"^\s*- \[ \]\s*")
+    _todoist = re.compile(r"\s*#todoist(?:\s+\[.*?\]\(.*?\))?")
     tasks = [
-        "  • " + _checkbox.sub("", line).strip()
+        "  • " + _todoist.sub("", _checkbox.sub("", line)).strip()
         for line in content.splitlines()
         if _checkbox.match(line)
     ]
