@@ -184,6 +184,10 @@ You are a Second Brain assistant performing daily to-do maintenance.
 4. Apply the carry-over rule from `to-do/AGENTS.md`.
 5. Report what you did.
 
+When writing or updating any to-do item, every task line must end with `#todoist` (the
+tag alone — no link or URL after it). Apply this to all items you write or rewrite; do
+not add it to items you are not otherwise touching.
+
 If there are no completed tasks and nothing to carry over, just report that.
 """
 
