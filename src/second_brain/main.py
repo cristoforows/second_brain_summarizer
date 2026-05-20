@@ -22,6 +22,23 @@ from second_brain.utils.parser import parse_dump
 log = structlog.get_logger()
 
 
+_CHECKBOX_RE = re.compile(r"^\s*- \[ \]\s*")
+_OBSIDIAN_ANNOTATION_RE = re.compile(r"\s*%%.*?%%")
+_TODOIST_LINK_RE = re.compile(r"\s*\[[^\]]*\]\(todoist://[^)]*\)")
+_LEGACY_TODOIST_TAG_RE = re.compile(r"\s*#todoist(?:\s+\[.*?\]\(.*?\))?")
+_MARKDOWN_LINK_RE = re.compile(r"\[([^\]]+)\]\([^)]+\)")
+
+
+def _clean_todo_line(line: str) -> str:
+    """Strip checkbox, Todoist sync artifacts, and markdown link syntax from a to-do line."""
+    line = _CHECKBOX_RE.sub("", line)
+    line = _OBSIDIAN_ANNOTATION_RE.sub("", line)
+    line = _TODOIST_LINK_RE.sub("", line)
+    line = _LEGACY_TODOIST_TAG_RE.sub("", line)
+    line = _MARKDOWN_LINK_RE.sub(r"\1", line)
+    return line.strip()
+
+
 def _format_run_summary(date_str: str, message_count: int, updates: list[str]) -> str:
     lines = [f"📝 Second Brain · {date_str}", ""]
     if message_count:
@@ -52,12 +69,10 @@ def _get_active_todos(drive: DriveService, output_folder_id: str) -> str | None:
         log.error("todo_read_failed", error=str(e))
         return None
 
-    _checkbox = re.compile(r"^\s*- \[ \]\s*")
-    _todoist = re.compile(r"\s*#todoist(?:\s+\[.*?\]\(.*?\))?")
     tasks = [
-        "  • " + _todoist.sub("", _checkbox.sub("", line)).strip()
+        "  • " + _clean_todo_line(line)
         for line in content.splitlines()
-        if _checkbox.match(line)
+        if _CHECKBOX_RE.match(line)
     ]
     if not tasks:
         return "📋 Active To-Dos\n\nAll clear! 🎉"

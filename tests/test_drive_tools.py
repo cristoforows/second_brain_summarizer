@@ -154,13 +154,13 @@ class TestReadCategorySummary:
         result = read_category_summary.invoke({"category_name": "work"})
         assert "# Work" in result
 
-    def test_no_directory_md(self) -> None:
+    def test_no_directory_yaml(self) -> None:
         _drive().find_file.side_effect = [
             {"id": "folder-id", "mimeType": "application/vnd.google-apps.folder"},
             None,
         ]
         result = read_category_summary.invoke({"category_name": "work"})
-        assert "no directory.md yet" in result
+        assert "no Directory.yaml yet" in result
 
     def test_nested_path_summary_found(self) -> None:
         _drive().find_file.side_effect = [
@@ -267,7 +267,9 @@ class TestWriteToCategory:
             }
         )
         assert "Created" in result
-        _drive().write_file.assert_called_once_with("topic-id", "notes.md", "content")
+        _drive().write_file.assert_called_once_with(
+            "topic-id", "notes.md", "content", "projects/dashboard-redesign/notes.md"
+        )
 
 
 # ------------------------------------------------------------------
@@ -294,7 +296,7 @@ class TestUpdateCategorySummary:
         )
         assert "Created directory" in result
         _drive().write_file.assert_called_once_with(
-            "folder-id", "directory.md", "# Work\nOverview."
+            "folder-id", "Directory.yaml", "# Work\nOverview.", "work/Directory.yaml"
         )
 
     def test_updates_summary(self) -> None:
@@ -306,7 +308,7 @@ class TestUpdateCategorySummary:
             {"category_name": "work", "summary": "updated"}
         )
         assert "Updated directory" in result
-        _drive().update_file.assert_called_once_with("summary-id", "updated", "work/directory.md")
+        _drive().update_file.assert_called_once_with("summary-id", "updated", "work/Directory.yaml")
 
 
 # ------------------------------------------------------------------
@@ -325,7 +327,7 @@ class TestUpdateDirectoryIndex:
         _drive().find_file.return_value = {"id": "dir-id"}
         result = update_directory_index.invoke({"content": "# Dir updated"})
         assert "Updated" in result
-        _drive().update_file.assert_called_once_with("dir-id", "# Dir updated", "directory.md")
+        _drive().update_file.assert_called_once_with("dir-id", "# Dir updated", "Directory.yaml")
 
 
 # ------------------------------------------------------------------
