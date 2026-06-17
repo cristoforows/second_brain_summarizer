@@ -55,6 +55,27 @@ def _format_run_summary(date_str: str, message_count: int, updates: list[str]) -
     return "\n".join(lines)
 
 
+_TODO_BAR = "━━━━━━━━━━━━━━━━━━"
+
+
+def _format_active_todos(tasks: list[str]) -> str:
+    """Build an eye-catching Telegram message from a list of cleaned task strings."""
+    if not tasks:
+        return f"{_TODO_BAR}\n✅  ALL CLEAR\n{_TODO_BAR}\n\nNothing on your plate — enjoy it! 🎉"
+
+    count = len(tasks)
+    lines = [
+        f"🚨🚨  {count} TO-DO{'S' if count != 1 else ''} NEED YOU  🚨🚨",
+        _TODO_BAR,
+        "",
+    ]
+    for i, task in enumerate(tasks, 1):
+        lines.append(f"👉  {i}.  {task}")
+        lines.append("")
+    lines += [_TODO_BAR, "⚡ Knock these out today — don't let them slip."]
+    return "\n".join(lines)
+
+
 def _get_active_todos(drive: DriveService, output_folder_id: str) -> str | None:
     """Read the to-do file from Drive and return a formatted active task list, or None on failure."""
     try:
@@ -70,13 +91,11 @@ def _get_active_todos(drive: DriveService, output_folder_id: str) -> str | None:
         return None
 
     tasks = [
-        "  • " + _clean_todo_line(line)
+        _clean_todo_line(line)
         for line in content.splitlines()
         if _CHECKBOX_RE.match(line)
     ]
-    if not tasks:
-        return "📋 Active To-Dos\n\nAll clear! 🎉"
-    return "📋 Active To-Dos\n\n" + "\n".join(tasks)
+    return _format_active_todos(tasks)
 
 
 def _init_agent(dry_run: bool = False) -> tuple:

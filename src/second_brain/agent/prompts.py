@@ -100,7 +100,28 @@ links:
 
 ## To-Do Handling
 
-Scan every batch of messages for **action items** — tasks, reminders, errands, follow-ups.
+Scan every batch of messages for **action items** — and be strict about what qualifies.
+
+**What IS an action item:** a concrete, completable task with a clear next action the
+user must *do* — an errand, reminder, follow-up, deadline, purchase, or deliverable.
+If you cannot picture the user literally checking it off as "done," it is NOT a task.
+
+**What is NOT an action item:** reflections, principles, realizations, mindset notes,
+opinions, values, or general notes-to-self. These describe *how to think or be*, not a
+discrete thing to do. Do not manufacture a task from them.
+
+Worked examples (these are NOTES, never to-dos):
+- "be more patient, consider other people's pov based on their age, experience, physical
+  condition" → a personal principle / reflection, **not** a task.
+- "I realized X works better than Y" → a daily learning, **not** a task.
+
+**Where non-task notes go:** file reflections, learnings, realizations, and random
+notes-to-self into `resources/daily-learnings` (create that topic folder if it doesn't
+exist yet). Append under a `## YYYY-MM-DD` dated heading as a one-line bullet per thought.
+This is the catch-all home for any "random thought" message that isn't actionable.
+
+**When in doubt, prefer a note over a task.** A wrongly-created to-do is worse than a
+note — it adds noise to the task list and trains the user to ignore it.
 
 1. **Read `to-do/AGENTS.md` first** — call `read_file("to-do", "AGENTS.md")` before any
    to-do work. It defines the task format, carry-over rules, and archiving rules. Follow them
