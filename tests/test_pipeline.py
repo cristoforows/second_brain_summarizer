@@ -18,9 +18,14 @@ def _make_settings() -> MagicMock:
     settings.telegram_outbound_url = ""
     settings.telegram_outbound_secret = ""
     settings.telegram_chat_id = ""
+    settings.google_calendar_id = "cal-id"
     return settings
 
 
+@patch(f"{_MODULE}.get_all_calendar_tools")
+@patch(f"{_MODULE}.init_calendar_tools")
+@patch(f"{_MODULE}.CalendarService")
+@patch(f"{_MODULE}.load_credentials")
 @patch(f"{_MODULE}.run_agent_with_prompt")
 @patch(f"{_MODULE}.run_agent")
 @patch(f"{_MODULE}.build_agent")
@@ -36,10 +41,15 @@ def test_full_pipeline(
     mock_build_agent: MagicMock,
     mock_run_agent: MagicMock,
     mock_run_agent_with_prompt: MagicMock,
+    mock_load_credentials: MagicMock,
+    mock_calendar_cls: MagicMock,
+    mock_init_calendar_tools: MagicMock,
+    mock_get_all_calendar_tools: MagicMock,
     sample_dump_text: str,
 ) -> None:
     """Pipeline finds the dump file, parses messages, and invokes the agent."""
     mock_settings.return_value = _make_settings()
+    mock_get_all_calendar_tools.return_value = []
 
     drive = mock_drive_cls.return_value
     drive.find_file.return_value = {"id": "dump-id", "name": "2025-03-01"}
@@ -51,7 +61,8 @@ def test_full_pipeline(
     run_pipeline(date_str="2025-03-01")
 
     # Verify the pipeline steps
-    mock_drive_cls.assert_called_once_with("/fake/sa.json")
+    mock_load_credentials.assert_called_once_with("/fake/sa.json")
+    mock_drive_cls.assert_called_once_with(creds=mock_load_credentials.return_value)
     mock_init_tools.assert_called_once_with(drive, "output-folder", dry_run=False)
     drive.find_file.assert_any_call("input-folder", "2025-03-01.md")
     drive.read_file_raw.assert_any_call("dump-id", "2025-03-01.md")
@@ -65,6 +76,10 @@ def test_full_pipeline(
     assert len(agent_messages) == 5
 
 
+@patch(f"{_MODULE}.get_all_calendar_tools")
+@patch(f"{_MODULE}.init_calendar_tools")
+@patch(f"{_MODULE}.CalendarService")
+@patch(f"{_MODULE}.load_credentials")
 @patch(f"{_MODULE}.run_agent_with_prompt")
 @patch(f"{_MODULE}.run_agent")
 @patch(f"{_MODULE}.build_agent")
@@ -80,9 +95,14 @@ def test_pipeline_no_dump_file(
     mock_build_agent: MagicMock,
     mock_run_agent: MagicMock,
     mock_run_agent_with_prompt: MagicMock,
+    mock_load_credentials: MagicMock,
+    mock_calendar_cls: MagicMock,
+    mock_init_calendar_tools: MagicMock,
+    mock_get_all_calendar_tools: MagicMock,
 ) -> None:
     """When no dump file exists, the pipeline runs to-do maintenance instead."""
     mock_settings.return_value = _make_settings()
+    mock_get_all_calendar_tools.return_value = []
 
     drive = mock_drive_cls.return_value
     drive.find_file.return_value = None
@@ -97,6 +117,10 @@ def test_pipeline_no_dump_file(
     mock_run_agent_with_prompt.assert_called_once()
 
 
+@patch(f"{_MODULE}.get_all_calendar_tools")
+@patch(f"{_MODULE}.init_calendar_tools")
+@patch(f"{_MODULE}.CalendarService")
+@patch(f"{_MODULE}.load_credentials")
 @patch(f"{_MODULE}.run_agent_with_prompt")
 @patch(f"{_MODULE}.run_agent")
 @patch(f"{_MODULE}.build_agent")
@@ -112,9 +136,14 @@ def test_pipeline_empty_dump_file(
     mock_build_agent: MagicMock,
     mock_run_agent: MagicMock,
     mock_run_agent_with_prompt: MagicMock,
+    mock_load_credentials: MagicMock,
+    mock_calendar_cls: MagicMock,
+    mock_init_calendar_tools: MagicMock,
+    mock_get_all_calendar_tools: MagicMock,
 ) -> None:
     """A dump file with no parseable messages still triggers to-do maintenance."""
     mock_settings.return_value = _make_settings()
+    mock_get_all_calendar_tools.return_value = []
 
     drive = mock_drive_cls.return_value
     drive.find_file.return_value = {"id": "dump-id", "name": "2025-03-01"}
