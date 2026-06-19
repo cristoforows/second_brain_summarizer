@@ -11,7 +11,7 @@ from second_brain.services.drive import DriveService
 def drive() -> DriveService:
     """Create a DriveService with mocked credentials loading and API client."""
     with (
-        patch("second_brain.services.drive._load_credentials") as mock_load,
+        patch("second_brain.services.auth.load_credentials") as mock_load,
         patch("second_brain.services.drive.build") as mock_build,
     ):
         mock_load.return_value = MagicMock()

@@ -8,7 +8,6 @@ import yaml
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from second_brain.core.models import Category
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]  # second_brain_summarizer/
 
@@ -37,10 +36,10 @@ class Settings(BaseSettings):
     telegram_outbound_url: str = ""
     telegram_outbound_secret: str = ""
     telegram_chat_id: str = ""
+    google_calendar_id: str = "primary"
 
     # --- Non-secrets (from config.yaml) ---
     llm: LLMConfig = Field(default_factory=LLMConfig)
-    seed_categories: list[Category] = Field(default_factory=list)
 
     @model_validator(mode="before")
     @classmethod
